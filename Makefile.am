@@ -1,7 +1,7 @@
 ACLOCAL_AMFLAGS = -I m4 --install
-bin_PROGRAMS = hello
-hello_SOURCES = src/hello.c src/sum.c src/sum.h
-hello_CPPFLAGS = -DDEBUG
+bin_PROGRAMS = miRA
+miRA_SOURCES = src/main.c src/sum.c src/sum.h
+miRA_CPPFLAGS = -DDEBUG
 
 TESTS = check_sum
 check_PROGRAMS = check_sum

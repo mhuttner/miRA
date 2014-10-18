@@ -1,8 +1,8 @@
-AC_INIT([hello], [0.01], [ss@sobering.ca],
-        [hello], [http://tankapp.com/])
+AC_INIT([miRA], [0.1], [michael@mhuttner.com],
+        [miRA], [http://mhuttner.com/])
 AC_PREREQ([2.68])
 
-AC_CONFIG_SRCDIR([src/hello.c])
+AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_HEADERS([config.h])
 
 AC_CONFIG_AUX_DIR([build-aux])
