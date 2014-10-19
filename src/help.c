@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "config.h"
 #include "help.h"
+#include "errors.h"
 
 int help(int argc,char** argv)
 {
@@ -23,5 +24,5 @@ int help(int argc,char** argv)
         "    help       show this help message\n"
         "\n"
         ,PACKAGE,PACKAGE_VERSION);
-    return 0;
+    return E_SUCCESS;
 }

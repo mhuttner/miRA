@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "sum.h"
 #include "help.h"
 #include "cluster.h"
+#include "errors.h"
 
 int main( int argc, char **argv )
 {
@@ -33,5 +33,5 @@ int main( int argc, char **argv )
 
     
 
-    return EXIT_SUCCESS;
+    return E_SUCCESS;
 }

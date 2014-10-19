@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include "cluster.h"
 #include "parse_sam.h"
+#include "errors.h"
 
 int cluster(int argc,char** argv){
     int c;
@@ -36,12 +37,12 @@ int cluster(int argc,char** argv){
     parse_sam(NULL,argv[optind]);
 
 
-    return 0;
+    return E_SUCCESS;
 }
 
 
 
-void print_help(){
+int print_help(){
     printf(
         "Description:\n"
         "    cluster generates a list of main expression contigs based on\n"
@@ -49,6 +50,7 @@ void print_help(){
         "Usage: miRA cluster [-g gapsize] [-w windowsize] [-f minreadnumber]\n"
         "                    [-l maxlength] [-o outputfile] [-h] <input SAM file> \n"
         );
+    return E_SUCCESS;
 }
 
 
