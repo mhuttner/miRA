@@ -6,6 +6,7 @@
 struct sam_file
 {
     size_t n;
+    size_t capacity;
     struct sam_entry* entries;
 };
 

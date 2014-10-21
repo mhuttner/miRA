@@ -9,16 +9,29 @@
 int parse_sam(struct sam_file** sam,char* file)
 {
     static const int MAXLINELENGHT = 2048;
-    static const int STARTINGSIZE = 100;
+    static const int STARTINGSIZE = 1024;
+    struct sam_file* data = (struct sam_file*)malloc(sizeof(struct sam_file));
+
+    data->capacity = STARTINGSIZE;
+    data->entries = (struct sam_entry*)malloc(data->capacity * sizeof(struct sam_entry));
+    data->n=0;
+
     FILE* fp = fopen(file,"r");
     if(fp==NULL){
         return E_FILE_NOT_FOUND;
     }
     char line[MAXLINELENGHT];
     while(fgets(line,sizeof(line),fp) != NULL){
-        parse_line(NULL,line,MAXLINELENGHT);
+        int result = parse_line(data->entries+data->n,line,MAXLINELENGHT);
+        if(result != E_SUCCESS) continue;
+        data->n++;
+        if(data->n==data->capacity){
+            data->capacity *=2;
+            data->entries=(struct sam_entry*)realloc(data->entries,data->capacity*sizeof(struct sam_entry));
+        }
     }
     fclose(fp);
+    *sam = data;
 
     return E_SUCCESS;
 }
@@ -121,6 +134,7 @@ int free_sam(struct sam_file* sam)
     for(int i=0;i<sam->n;i++){
         free_sam_entry(sam->entries+i);
     }
+    free(sam->entries);
     return E_SUCCESS;   
 }
 
@@ -131,7 +145,6 @@ int free_sam_entry(struct sam_entry* e){
     free(e->rnext);
     free(e->seq);
     free(e->qual);
-    free(e);
     return E_SUCCESS;
 };
 

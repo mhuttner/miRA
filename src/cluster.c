@@ -34,8 +34,10 @@ int cluster(int argc,char** argv){
         printf("No SAM File specified\n\n");
         print_help();
     }
-    parse_sam(NULL,argv[optind]);
+    struct sam_file* sam = NULL;
+    parse_sam(&sam,argv[optind]);
 
+    free_sam(sam);
 
     return E_SUCCESS;
 }
