@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <getopt.h>
 #include "cluster.h"
 #include "parse_sam.h"
 #include "errors.h"
+#include "string.h"
 
-int cluster(int argc,char** argv){
+int cluster(int argc,char** argv)
+{
     int c;
     char* test=NULL;
     while((c = getopt(argc, argv, "g:w:r:l:o:h")) != -1){
@@ -33,9 +36,20 @@ int cluster(int argc,char** argv){
     if(optind >= argc){ /* missing input file */
         printf("No SAM File specified\n\n");
         print_help();
+        return E_NO_FILE_SPECIFIED;
     }
     struct sam_file* sam = NULL;
-    parse_sam(&sam,argv[optind]);
+    int err = parse_sam(&sam,argv[optind]);
+    if(err == E_FILE_NOT_FOUND){
+        printf("File %s not found\n",argv[optind]);
+        return E_FILE_NOT_FOUND;
+    }
+    if(err != E_SUCCESS){
+        printf("Unknown Error\n");
+        return E_UNKNOWN;
+    }
+
+    //cluster
 
     free_sam(sam);
 
@@ -44,7 +58,8 @@ int cluster(int argc,char** argv){
 
 
 
-int print_help(){
+int print_help()
+{
     printf(
         "Description:\n"
         "    cluster generates a list of main expression contigs based on\n"
@@ -52,6 +67,66 @@ int print_help(){
         "Usage: miRA cluster [-g gapsize] [-w windowsize] [-f minreadnumber]\n"
         "                    [-l maxlength] [-o outputfile] [-h] <input SAM file> \n"
         );
+    return E_SUCCESS;
+}
+
+int create_clusters(struct cluster_list** list,struct sam_file* sam){
+    struct cluster_list* tmp_list = (struct cluster_list*)malloc(sizeof(struct cluster_list));
+    if(tmp_list == NULL){
+        return E_MALLOC_FAIL;
+    }
+    tmp_list->capacity = sam->n;
+    tmp_list->clusters = (struct cluster*)malloc(tmp_list->capacity*sizeof(struct cluster));
+    if(tmp_list->clusters == NULL){
+        free(tmp_list);
+        return E_MALLOC_FAIL;
+    }
+    size_t n =0;
+    for (size_t i = 0; i < sam->n; i++)
+    {
+        int result = sam_to_cluster(tmp_list->clusters+n,sam->entries+i,n);
+        if(result!=E_SUCCESS) continue;
+        n++;
+    }
+    *list = tmp_list;
+    return E_SUCCESS;
+}
+
+int sam_to_cluster(struct cluster* cluster,struct sam_entry* entry,long id)
+{
+    const char POSITIVE_STRAND_SYMBOL = '+';
+    const char NEGATIVE_STRAND_SYMBOL = '-';
+
+    cluster->id = id;
+    if(entry->flag && REV_COMPLM){
+        cluster->strand = NEGATIVE_STRAND_SYMBOL;
+    } else {
+        cluster->strand = POSITIVE_STRAND_SYMBOL;
+    }
+    int n = strlen(entry->rname)+1;
+    cluster->chrom = (char*)malloc(n*sizeof(char));
+    if(cluster->chrom == NULL) return E_MALLOC_FAIL;
+    strcpy(cluster->chrom, entry->rname);
+
+    cluster->start = entry->pos;
+    cluster->end = entry->pos + strlen(entry->seq);
+    cluster->readcount = 1;
+
+
+    
+    return E_SUCCESS;
+}
+
+int free_clusters(struct cluster_list* list){
+    for(size_t i=0;i<list->n;i++){
+        free_cluster(list->clusters[i]);
+    }
+    free(list->clusters);
+    free(list);
+    return E_SUCCESS;
+}
+int free_cluster(struct cluster* c){
+    free(c->chrom);
     return E_SUCCESS;
 }
 

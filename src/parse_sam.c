@@ -10,13 +10,22 @@ int parse_sam(struct sam_file** sam,char* file)
     static const int MAXLINELENGHT = 2048;
     static const int STARTINGSIZE = 1024;
     struct sam_file* data = (struct sam_file*)malloc(sizeof(struct sam_file));
+    if(data == NULL){
+        return E_MALLOC_FAIL;
+    }
 
     data->capacity = STARTINGSIZE;
     data->entries = (struct sam_entry*)malloc(data->capacity * sizeof(struct sam_entry));
+    if(data->entries == NULL){
+        free(data);
+        return E_MALLOC_FAIL;
+    }
     data->n=0;
 
     FILE* fp = fopen(file,"r");
     if(fp==NULL){
+        free(data->entries);
+        free(data);
         return E_FILE_NOT_FOUND;
     }
     char line[MAXLINELENGHT];
@@ -26,7 +35,14 @@ int parse_sam(struct sam_file** sam,char* file)
         data->n++;
         if(data->n==data->capacity){
             data->capacity *=2;
-            data->entries=(struct sam_entry*)realloc(data->entries,data->capacity*sizeof(struct sam_entry));
+            struct sam_entry* tmp=(struct sam_entry*)realloc(data->entries,data->capacity*sizeof(struct sam_entry));
+            if(tmp == NULL){
+                free(data->entries);
+                free(data);
+                fclose(fp);
+                return E_REALLOC_FAIL;
+            }
+            data->entries=tmp;
         }
     }
     fclose(fp);
@@ -43,6 +59,9 @@ int parse_line(struct sam_entry* e, char* line, int maxlength){
     char* end = NULL;
     if(line[0] == header_line_marker) return E_SAM_HEADER_LINE;
     char** tokens = (char**)malloc(num_entries*sizeof(char*));
+    if(tokens == NULL){
+        return E_MALLOC_FAIL;
+    }
     int line_done =0;
     int current_token =0;
     
@@ -57,7 +76,7 @@ int parse_line(struct sam_entry* e, char* line, int maxlength){
             if(end == NULL) end = strchr(start,'\0');
             line_done=1;
         }
-        int l = end - start;
+        long l = end - start;
         tokens[current_token] = (char*)malloc((l+1)*sizeof(char));
         memcpy(tokens[current_token],start,l);
         tokens[current_token][l]=0;
@@ -130,10 +149,11 @@ int parse_line(struct sam_entry* e, char* line, int maxlength){
 
 int free_sam(struct sam_file* sam)
 {
-    for(int i=0;i<sam->n;i++){
+    for(size_t i=0;i<sam->n;i++){
         free_sam_entry(sam->entries+i);
     }
     free(sam->entries);
+    free(sam);
     return E_SUCCESS;   
 }
 
