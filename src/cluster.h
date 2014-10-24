@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include "parse_sam.h"
 
 #ifndef CLUSTER_H
 #define CLUSTER_H 
@@ -22,10 +23,12 @@ struct cluster_list {
 int cluster(int argc,char** argv);
 int print_help();
 
-int create_clusters(struct cluster_list** index,struct sam_file* sam);
+int create_clusters(struct cluster_list** list,struct sam_file* sam);
+int sort_clusters(struct cluster_list* list);
+int compare_clusters(const void* c1,const void* c2);
 int sam_to_cluster(struct cluster* cluster,struct sam_entry* entry,long id);
 
 int free_clusters(struct cluster_list* list);
-int free_cluster(struct cluster c);
+int free_cluster(struct cluster* c);
 
 #endif

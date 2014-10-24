@@ -10,12 +10,14 @@ enum _error {
 
     E_MALLOC_FAIL = -30,
     E_REALLOC_FAIL = -31,
-    E_UNKNOWN = -42
+    E_UNKNOWN = -99
 };
 
 struct _errordesc {
     int code;
     const char *message;
 };
+
+int print_error(int err);
 
 #endif

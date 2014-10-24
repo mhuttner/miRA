@@ -49,9 +49,18 @@ int cluster(int argc,char** argv)
         return E_UNKNOWN;
     }
 
-    //cluster
-
+    struct cluster_list* list= NULL;
+    err = create_clusters(&list,sam);
+    if(err != E_SUCCESS){
+        print_error(err);
+        free_sam(sam);
+        return err;
+    }
     free_sam(sam);
+    sort_clusters(list);
+    
+    
+    free_clusters(list);
 
     return E_SUCCESS;
 }
@@ -88,9 +97,27 @@ int create_clusters(struct cluster_list** list,struct sam_file* sam){
         if(result!=E_SUCCESS) continue;
         n++;
     }
+    tmp_list->n = n;
     *list = tmp_list;
     return E_SUCCESS;
 }
+int sort_clusters(struct cluster_list* list){
+    qsort(list->clusters,list->n,sizeof(struct cluster),compare_clusters);
+    return E_SUCCESS;
+}
+
+int compare_clusters(const void* c1,const void* c2){
+    struct cluster* cl1 = (struct cluster*)c1;
+    struct cluster* cl2 = (struct cluster*)c2;
+    int diff;
+    diff = cl1->strand - cl2->strand;
+    if(diff !=0) return diff;
+    diff = strcmp(cl1->chrom,cl2->chrom);
+    if(diff !=0) return diff;
+    diff = cl1->chrom - cl2->chrom;
+    return diff;
+}
+
 
 int sam_to_cluster(struct cluster* cluster,struct sam_entry* entry,long id)
 {
@@ -98,7 +125,7 @@ int sam_to_cluster(struct cluster* cluster,struct sam_entry* entry,long id)
     const char NEGATIVE_STRAND_SYMBOL = '-';
 
     cluster->id = id;
-    if(entry->flag && REV_COMPLM){
+    if(entry->flag & REV_COMPLM){
         cluster->strand = NEGATIVE_STRAND_SYMBOL;
     } else {
         cluster->strand = POSITIVE_STRAND_SYMBOL;
@@ -119,7 +146,7 @@ int sam_to_cluster(struct cluster* cluster,struct sam_entry* entry,long id)
 
 int free_clusters(struct cluster_list* list){
     for(size_t i=0;i<list->n;i++){
-        free_cluster(list->clusters[i]);
+        free_cluster(list->clusters+i);
     }
     free(list->clusters);
     free(list);
