@@ -7,6 +7,8 @@ enum _error {
     E_NO_FILE_SPECIFIED = -2,
     E_INVALID_SAM_LINE = -3,
     E_SAM_HEADER_LINE = -4,
+    E_INVALID_ARGUMENT = -5,
+    E_SAM_NON_SQ_HEADER = -6,
 
     E_MALLOC_FAIL = -30,
     E_REALLOC_FAIL = -31,

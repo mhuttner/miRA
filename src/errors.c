@@ -6,7 +6,9 @@ struct _errordesc errordesc[] = {
     { E_FILE_NOT_FOUND, "The File was not found"},
     { E_NO_FILE_SPECIFIED, "No file was given"},
     { E_INVALID_SAM_LINE, "The Line of the SAM File is invalid"},
-    { E_SAM_HEADER_LINE, "The Line is a Header Line and was not parsed"},
+    { E_SAM_HEADER_LINE, "The Line is a Header Line"},
+    { E_INVALID_ARGUMENT, "Invalid commad line argument"},
+    { E_SAM_NON_SQ_HEADER,"The Line is a Header Line that was ignored"},
     { E_MALLOC_FAIL , "malloc failed, check available memory"},
     { E_REALLOC_FAIL, "realloc failed, check available memory"},
     { E_UNKNOWN, "An unknown error occured"}

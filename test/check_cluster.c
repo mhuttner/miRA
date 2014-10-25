@@ -25,11 +25,32 @@ START_TEST (test_create_clusters)
 }
 END_TEST
 
+START_TEST (test_sort_clusters)
+{
+    struct cluster_list list;
+    list.n=4;
+    list.capacity=4;
+    struct cluster test_clusters[]={
+        {0,'-',"chrom_2",10l,20l,1},
+        {1,'+',"chrom_2",30l,40l,1},
+        {2,'+',"chrom_2",15l,25l,1},
+        {3,'+',"chrom_1",10l,20l,1}
+    };
+    list.clusters = test_clusters;
+    sort_clusters(&list);
+    ck_assert_int_eq(list.clusters[0].id,3);
+    ck_assert_int_eq(list.clusters[1].id,2);
+    ck_assert_int_eq(list.clusters[2].id,1);
+    ck_assert_int_eq(list.clusters[3].id,0);
+}
+END_TEST
+
 Suite *hello_suite( void )
 {
     Suite *s = suite_create("Cluster");
     TCase *tc_core = tcase_create("Core");
     tcase_add_test(tc_core, test_create_clusters);
+    tcase_add_test(tc_core, test_sort_clusters);
     suite_add_tcase(s, tc_core);
 
     return s;

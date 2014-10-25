@@ -13,32 +13,63 @@ int parse_sam(struct sam_file** sam,char* file)
     if(data == NULL){
         return E_MALLOC_FAIL;
     }
-
     data->capacity = STARTINGSIZE;
-    data->entries = (struct sam_entry*)malloc(data->capacity * sizeof(struct sam_entry));
+    data->entries = 
+        (struct sam_entry*)malloc(data->capacity * sizeof(struct sam_entry));
     if(data->entries == NULL){
         free(data);
         return E_MALLOC_FAIL;
     }
     data->n=0;
 
+    data->header_cap = STARTINGSIZE;
+    data->headers = 
+        (struct sq_header*)malloc(data->header_cap * sizeof(struct sq_header));
+    if(data->headers == NULL){
+        free(data->entries);
+        free(data);
+        return E_MALLOC_FAIL;
+    }
+    data->header_n = 0;
+
+
     FILE* fp = fopen(file,"r");
     if(fp==NULL){
         free(data->entries);
+        free(data->headers);
         free(data);
         return E_FILE_NOT_FOUND;
     }
     char line[MAXLINELENGHT];
     while(fgets(line,sizeof(line),fp) != NULL){
-        int result = parse_line(data->entries+data->n,line,MAXLINELENGHT);
+        int result = parse_line(data->entries+data->n,line);
+        if(result == E_SAM_HEADER_LINE){
+            int err = parse_header(data->headers+data->header_n,line);
+            if(err != E_SUCCESS) continue;
+            data->header_n++;
+            if(data->header_n == data->header_cap){
+                data->header_cap *=2;
+                struct sq_header* tmph = (struct sq_header*)
+                    realloc(data->headers,
+                            data->header_cap* sizeof(struct sq_header));
+                if(tmph == NULL){
+                    free_sam(data);
+                    fclose(fp);
+                    return E_REALLOC_FAIL;
+                }
+                data->headers=tmph;
+            }
+            continue;
+        }
         if(result != E_SUCCESS) continue;
         data->n++;
         if(data->n==data->capacity){
             data->capacity *=2;
-            struct sam_entry* tmp=(struct sam_entry*)realloc(data->entries,data->capacity*sizeof(struct sam_entry));
+            struct sam_entry* tmp=
+                (struct sam_entry*)realloc(data->entries,data->capacity
+                                           *sizeof(struct sam_entry));
             if(tmp == NULL){
-                free(data->entries);
-                free(data);
+                free_sam(data);
                 fclose(fp);
                 return E_REALLOC_FAIL;
             }
@@ -50,7 +81,7 @@ int parse_sam(struct sam_file** sam,char* file)
 
     return E_SUCCESS;
 }
-int parse_line(struct sam_entry* e, char* line, int maxlength){
+int parse_line(struct sam_entry* e, char* line){
     const char seperator = '\t';
     const int num_entries = 11;
     const char header_line_marker = '@';
@@ -146,13 +177,67 @@ int parse_line(struct sam_entry* e, char* line, int maxlength){
     }
 }
 
+int parse_header(struct sq_header* header,char* line){
+    const char* sq_header_marker = "@SQ";
+    const char* sq_sn_marker = "SN:";
+    const char* sq_ln_marker = "LN:";
+    const int marker_length = 3;
+    const char seperator = '\t';
+
+    if(strncmp(line,sq_header_marker,marker_length) != 0){
+        return E_SAM_NON_SQ_HEADER;
+    }
+    char* start = strchr(line,seperator)+1;
+    if(strncmp(start,sq_sn_marker,marker_length) != 0){
+        return E_INVALID_SAM_LINE;
+    }
+    start +=marker_length;
+    char* end = strchr(start,seperator);
+
+    int l = end-start;
+    char* sn = (char*)malloc((l+1)*sizeof(char));
+    if(sn==NULL){
+        return E_MALLOC_FAIL;
+    }
+    memcpy(sn,start,l);
+    sn[l]=0;
+
+    start = end+1;
+    if(strncmp(start,sq_ln_marker,marker_length) != 0){
+        free(sn);
+        return E_INVALID_SAM_LINE;
+    }
+    start+=marker_length;
+    end = strchr(start,seperator);
+    if(end == NULL){
+        end = strchr(start,'\n');
+        if(end == NULL){
+            free(sn);
+            return E_INVALID_SAM_LINE;
+        }
+    }
+    char* check = NULL;
+    long ln = strtol(start,&check,10);
+    if(check != end){
+        free(sn);
+        return E_INVALID_SAM_LINE;
+    }
+    header->sn = sn;
+    header->ln = ln;
+    return E_SUCCESS;
+}
+
 
 int free_sam(struct sam_file* sam)
 {
     for(size_t i=0;i<sam->n;i++){
         free_sam_entry(sam->entries+i);
     }
+    for(size_t i=0;i<sam->header_n;i++){
+        free((sam->headers+i)->sn);
+    }
     free(sam->entries);
+    free(sam->headers);
     free(sam);
     return E_SUCCESS;   
 }
