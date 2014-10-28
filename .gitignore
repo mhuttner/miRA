@@ -2,7 +2,7 @@
 
 *.*.gz
 *.log
-*.m4
+
 *.o
 *.trs
 .deps/
@@ -12,8 +12,8 @@
 autom4te.cache/
 check_sum
 
-config.h.in
-config.h.in~
+
+
 config.log
 config.status
 
