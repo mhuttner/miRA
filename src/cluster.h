@@ -33,10 +33,11 @@ int print_help();
 
 int create_clusters(struct cluster_list **list, struct sam_file *sam);
 
-int sort_clusters(struct cluster_list *list, int compare_strand);
-int compare_clusters(const void *c1, const void *c2);
-int compare_extended_clusters(const void *c1, const void *c2);
-int compare_extended_clusters_strand(const void *c1, const void *c2);
+int sort_clusters(struct cluster_list *list,
+                  int (*comparison_func)(const void *c1, const void *c2));
+int compare_strand_chrom_start(const void *c1, const void *c2);
+int compare_chrom_flank(const void *c1, const void *c2);
+int compare_strand_chrom_flank(const void *c1, const void *c2);
 int merge_clusters(struct cluster_list *list, int max_gap);
 int filter_clusters(struct cluster_list *list, int minreads);
 int extend_clusters(struct cluster_list *list, struct chrom_info **table,

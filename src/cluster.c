@@ -88,7 +88,7 @@ int cluster(int argc, char **argv) {
   }
   free_sam(sam);
 
-  qsort(list->clusters, list->n, sizeof(struct cluster), compare_clusters);
+  sort_clusters(list, compare_strand_chrom_start);
   err = merge_clusters(list, 0);
   if (err != E_SUCCESS) {
     goto error_clusters;
@@ -106,8 +106,7 @@ int cluster(int argc, char **argv) {
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
-  qsort(list->clusters, list->n, sizeof(struct cluster),
-        compare_extended_clusters_strand);
+  sort_clusters(list, compare_strand_chrom_flank);
   err = merge_extended_clusters(list, max_length);
   if (err != E_SUCCESS) {
     goto error_clusters;
@@ -116,8 +115,7 @@ int cluster(int argc, char **argv) {
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
-  qsort(list->clusters, list->n, sizeof(struct cluster),
-        compare_extended_clusters);
+  sort_clusters(list, compare_chrom_flank);
 
   print_bed_file(NULL, list);
 
@@ -168,16 +166,13 @@ int create_clusters(struct cluster_list **list, struct sam_file *sam) {
   return E_SUCCESS;
 }
 
-int sort_clusters(struct cluster_list *list, int compare_strand) {
-  if (compare_strand != 0) {
-  } else {
-    qsort(list->clusters, list->n, sizeof(struct cluster), compare_clusters);
-  }
-
+int sort_clusters(struct cluster_list *list,
+                  int (*comparison_func)(const void *c1, const void *c2)) {
+  qsort(list->clusters, list->n, sizeof(struct cluster), comparison_func);
   return E_SUCCESS;
 }
 
-int compare_clusters(const void *c1, const void *c2) {
+int compare_strand_chrom_start(const void *c1, const void *c2) {
   struct cluster *cl1 = (struct cluster *)c1;
   struct cluster *cl2 = (struct cluster *)c2;
   int diff;
@@ -190,7 +185,7 @@ int compare_clusters(const void *c1, const void *c2) {
   diff = cl1->start - cl2->start;
   return diff;
 }
-int compare_extended_clusters(const void *c1, const void *c2) {
+int compare_chrom_flank(const void *c1, const void *c2) {
   struct cluster *cl1 = (struct cluster *)c1;
   struct cluster *cl2 = (struct cluster *)c2;
   int diff;
@@ -200,7 +195,7 @@ int compare_extended_clusters(const void *c1, const void *c2) {
   diff = cl1->flank_start - cl2->flank_start;
   return diff;
 }
-int compare_extended_clusters_strand(const void *c1, const void *c2) {
+int compare_strand_chrom_flank(const void *c1, const void *c2) {
   struct cluster *cl1 = (struct cluster *)c1;
   struct cluster *cl2 = (struct cluster *)c2;
   int diff;
@@ -321,9 +316,6 @@ int merge_extended_clusters(struct cluster_list *list, int max_length) {
       top++;
       *top = *c;
     } else {
-      // printf("%s \n C: %ld %ld %ld \n TOP: %ld %ld %ld\n", c->chrom,
-      //        c->readcount, c->start, c->end, top->readcount, top->start,
-      //        top->end);
       if (c->readcount >= top->readcount) {
         top->start = c->start;
         top->end = c->end;
