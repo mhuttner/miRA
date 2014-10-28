@@ -2,18 +2,19 @@
 
 *.*.gz
 *.log
-
+*.m4
 *.o
 *.trs
 .deps/
 
-
-
+Makefile.in
+aclocal.m4
 autom4te.cache/
+build-aux/
 check_sum
 
-
-
+config.h.in
+config.h.in~
 config.log
 config.status
 

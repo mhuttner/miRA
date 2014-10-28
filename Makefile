@@ -92,8 +92,7 @@ DIST_COMMON = INSTALL NEWS README AUTHORS ChangeLog \
 	$(top_srcdir)/build-aux/install-sh \
 	$(top_srcdir)/build-aux/missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/pkg.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
@@ -426,8 +425,6 @@ AWK = awk
 CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
-CHECK_CFLAGS = -D_THREAD_SAFE -I/usr/local/include 
-CHECK_LIBS = -L/usr/local/lib -lcheck 
 CPPFLAGS = 
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
@@ -456,9 +453,6 @@ PACKAGE_TARNAME = miRA
 PACKAGE_URL = http://mhuttner.com/
 PACKAGE_VERSION = 0.1
 PATH_SEPARATOR = :
-PKG_CONFIG = /usr/local/bin/pkg-config
-PKG_CONFIG_LIBDIR = 
-PKG_CONFIG_PATH = 
 SET_MAKE = 
 SHELL = /bin/sh
 STRIP = 
@@ -510,14 +504,14 @@ miRA_SOURCES = src/main.c src/help.c src/help.h src/cluster.c src/cluster.h src/
 miRA_CFLAGS = -std=c11
 miRA_CPPFLAGS = -DDEBUG
 check_sum_SOURCES = test/check_sum.c
-check_sum_CFLAGS = -D_THREAD_SAFE -I/usr/local/include 
-check_sum_LDADD = -L/usr/local/lib -lcheck 
+check_sum_CFLAGS = @CHECK_CFLAGS@
+check_sum_LDADD = @CHECK_LIBS@
 check_parse_sam_SOURCES = test/check_parse_sam.c src/parse_sam.c src/parse_sam.h src/errors.h src/errors.c
-check_parse_sam_CFLAGS = -D_THREAD_SAFE -I/usr/local/include 
-check_parse_sam_LDADD = -L/usr/local/lib -lcheck 
+check_parse_sam_CFLAGS = @CHECK_CFLAGS@
+check_parse_sam_LDADD = @CHECK_LIBS@
 check_cluster_SOURCES = test/check_cluster.c src/parse_sam.c src/parse_sam.h src/errors.h src/errors.c src/cluster.c src/cluster.h
-check_cluster_CFLAGS = -D_THREAD_SAFE -I/usr/local/include 
-check_cluster_LDADD = -L/usr/local/lib -lcheck 
+check_cluster_CFLAGS = @CHECK_CFLAGS@
+check_cluster_LDADD = @CHECK_LIBS@
 EXTRA_DIST = m4/NOTES
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
