@@ -6,11 +6,11 @@
 
 START_TEST(test_valid_line) {
   char sample_line[1000] =
-      "Seq23599_x1 272 scaffold_1  67  0   "
-      "21M *   0   0   GCCACCCATGCCGCATCCACA   "
-      "IIIIIIIIIIIIIIIIIIIII   AS:i:-6 XN:i:0  XM:i:1  XO:i:0  "
-      "XG:i:0  NM:i:1  MD:Z:12A8   YT:Z:UU NH:i:16 CC:Z:=  "
-      "CP:i:250    HI:i:0";
+      "Seq23599_x1\t272\tscaffold_1\t67\t0\t"
+      "21M\t*\t0\t0\tGCCACCCATGCCGCATCCACA\t"
+      "IIIIIIIIIIIIIIIIIIIII\tAS:i:-6\tXN:i:0\tXM:i:1\tXO:i:0\t"
+      "XG:i:0\tNM:i:1\tMD:Z:12A8\tYT:Z:UU\tNH:i:16\tCC:Z:=\t"
+      "CP:i:250\tHI:i:0";
   struct sam_entry test_entry;
   int result = parse_line(&test_entry, sample_line);
 
@@ -22,7 +22,7 @@ START_TEST(test_valid_line) {
 END_TEST
 
 START_TEST(test_header_line) {
-  char sample_line[100] = "@SQ SN:scaffold_1008\tLN:3885";
+  char sample_line[100] = "@SQ\tSN:scaffold_1008\tLN:3885";
   struct sam_entry test_entry;
   int result = parse_line(&test_entry, sample_line);
 
@@ -32,11 +32,11 @@ END_TEST
 
 START_TEST(test_invalid_line) {
   char sample_line[1000] =
-      "Seq23599_x1 272 scaffold_1  6a7 0   "
-      "21M *   0   0   GCCACCCATGCCGCATCCACA   "
-      "IIIIIIIIIIIIIIIIIIIII   AS:i:-6 XN:i:0  XM:i:1  XO:i:0  "
-      "XG:i:0  NM:i:1  MD:Z:12A8   YT:Z:UU NH:i:16 CC:Z:=  "
-      "CP:i:250    HI:i:0";
+      "Seq23599_x1\t272\tscaffold_1\t6a7\t0\t"
+      "21M\t*\t0\t0\tGCCACCCATGCCGCATCCACA\t"
+      "IIIIIIIIIIIIIIIIIIIII\tAS:i:-6\tXN:i:0\tXM:i:1\tXO:i:0\t"
+      "XG:i:0\tNM:i:1\tMD:Z:12A8\tYT:Z:UU\tNH:i:16\tCC:Z:=\t"
+      "CP:i:250\tHI:i:0";
   struct sam_entry test_entry;
   int result = parse_line(&test_entry, sample_line);
 
@@ -45,7 +45,7 @@ START_TEST(test_invalid_line) {
 END_TEST
 
 START_TEST(test_line_without_tabs) {
-  char sample_line[100] = "ajksndljka aksdjnlandkja sdlandjkas";
+  char sample_line[100] = "ajksndljka\taksdjnlandkja\tsdlandjkas";
   struct sam_entry test_entry;
   int result = parse_line(&test_entry, sample_line);
 
