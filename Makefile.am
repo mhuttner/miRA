@@ -4,11 +4,17 @@ miRA_SOURCES = src/main.c src/help.c src/cluster.c src/parse_sam.c src/errors.c
 miRA_CFLAGS = -std=c11
 miRA_CPPFLAGS = -DDEBUG
 
-check_PROGRAMS = miRAtest
-TESTS = $(check_PROGRAMS)
+noinst_PROGRAMS = miRAtest
 
-miRAtest_SOURCES = test/main.c
+
+miRAtest_SOURCES = test/main.c test/testerino.c test/sample_tests.c
 miRAtest_CFLAGS = -std=c11
+
+.PHONY: clean test
+
+test:	miRAtest
+	./miRAtest
+
 
 
 
