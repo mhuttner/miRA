@@ -106,7 +106,6 @@ int cluster(int argc, char **argv) {
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
-  sort_clusters(list, compare_strand_chrom_flank);
   err = merge_extended_clusters(list, max_length);
   if (err != E_SUCCESS) {
     goto error_clusters;
@@ -308,17 +307,22 @@ int merge_extended_clusters(struct cluster_list *list, int max_length) {
   }
   new_clusters[0] = list->clusters[0];
   struct cluster *top = new_clusters;
+  int total_readcount = 0;
   for (size_t i = 1; i < list->n; i++) {
     struct cluster *c = list->clusters + i;
     if (c->strand != top->strand || strcmp(c->chrom, top->chrom) != 0 ||
         c->flank_start > top->flank_end ||
         c->flank_end - top->flank_start > max_length) {
+      top->readcount = total_readcount;
       top++;
       *top = *c;
+      total_readcount = top->readcount;
     } else {
+      total_readcount += c->readcount;
       if (c->readcount >= top->readcount) {
         top->start = c->start;
         top->end = c->end;
+        top->readcount = c->readcount;
       }
       if (c->flank_end > top->flank_end) {
         top->flank_end = c->flank_end;

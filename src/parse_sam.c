@@ -107,6 +107,10 @@ int parse_line(struct sam_entry *e, char *line) {
       line_done = 1;
     }
     long l = end - start;
+    if (l == 0) {
+      start += 1;
+      continue;
+    }
     tokens[current_token] = (char *)malloc((l + 1) * sizeof(char));
     memcpy(tokens[current_token], start, l);
     tokens[current_token][l] = 0;

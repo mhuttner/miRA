@@ -7,7 +7,7 @@ miRA_CPPFLAGS = -DDEBUG
 noinst_PROGRAMS = miRAtest
 
 
-miRAtest_SOURCES = test/main.c test/testerino.c test/sample_tests.c
+miRAtest_SOURCES = test/main.c test/testerino.c test/test_cluster.c test/test_parse_sam.c src/errors.c src/parse_sam.c src/cluster.c
 miRAtest_CFLAGS = -std=c11
 
 .PHONY: clean test
