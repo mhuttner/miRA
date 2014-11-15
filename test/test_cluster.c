@@ -95,6 +95,7 @@ void test_sort_clusters(struct test *t) {
   t_assert_msg(t, list->clusters[1].id == 2, "Wrong cluster order");
   t_assert_msg(t, list->clusters[2].id == 1, "Wrong cluster order");
   t_assert_msg(t, list->clusters[3].id == 0, "Wrong cluster order");
+  free_clusters(list);
 }
 
 void test_merge_clusters(struct test *t) {
@@ -157,4 +158,5 @@ void test_merge_extended_clusters(struct test *t) {
   }
 
   t_fail(t, "");
+  free_clusters(list);
 }

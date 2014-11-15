@@ -3,14 +3,7 @@
 #ifndef PARSE_SAM_H
 #define PARSE_SAM_H
 
-struct sam_file {
-  size_t n;
-  size_t capacity;
-  struct sam_entry *entries;
-  size_t header_n;
-  size_t header_cap;
-  struct sq_header *headers;
-};
+
 
 struct sq_header {
   char *sn;
@@ -31,6 +24,15 @@ struct sam_entry {
   char *qual;
 };
 
+struct sam_file {
+  size_t n;
+  size_t capacity;
+  struct sam_entry **entries;
+  size_t header_n;
+  size_t header_cap;
+  struct sq_header **headers;
+};
+
 enum sam_flag {
   MULT_SEG = 0x1,
   PROP_ALIGN = 0x2,
@@ -47,9 +49,10 @@ enum sam_flag {
 };
 
 int parse_sam(struct sam_file **sam, char *file);
-int parse_line(struct sam_entry *e, char *line);
-int parse_header(struct sq_header *header, char *line);
+int parse_line(struct sam_entry **entry, char *line);
+int parse_header(struct sq_header **header, char *line);
 int free_sam(struct sam_file *sam);
 int free_sam_entry(struct sam_entry *e);
+int free_sam_header(struct sam_header* h);
 
 #endif

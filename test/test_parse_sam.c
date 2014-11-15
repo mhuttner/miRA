@@ -21,6 +21,7 @@ void test_valid_line(struct test *t) {
   t_log(t, "%s", test_entry.seq);
   t_assert_msg(t, strcmp(test_entry.seq, "GCCACCCATGCCGCATCCACA") == 0,
                "Sequence parsed wrong");
+  free_sam_entry(&test_entry);
 }
 
 void test_header_line(struct test *t) {
@@ -60,4 +61,5 @@ void test_multiple_consecutive_tabs(struct test *t) {
   t_assert_msg(t, test_entry.pos == 67, "Position parsed wrong");
   t_assert_msg(t, strcmp(test_entry.seq, "GCCACCCATGCCGCATCCACA") == 0,
                "Sequence parsed wrong");
+  free_sam_entry(&test_entry);
 }
