@@ -14,7 +14,7 @@ int parse_sam(struct sam_file **sam, char *file) {
   }
   data->capacity = STARTINGSIZE;
   data->entries =
-      (struct sam_entry **)malloc(data->capacity * sizeof(struct sam_entry*));
+      (struct sam_entry **)malloc(data->capacity * sizeof(struct sam_entry *));
   if (data->entries == NULL) {
     free(data);
     return E_MALLOC_FAIL;
@@ -22,8 +22,8 @@ int parse_sam(struct sam_file **sam, char *file) {
   data->n = 0;
 
   data->header_cap = STARTINGSIZE;
-  data->headers =
-      (struct sq_header **)malloc(data->header_cap * sizeof(struct sq_header*));
+  data->headers = (struct sq_header **)malloc(data->header_cap *
+                                              sizeof(struct sq_header *));
   if (data->headers == NULL) {
     free(data->entries);
     free(data);
@@ -40,16 +40,16 @@ int parse_sam(struct sam_file **sam, char *file) {
   }
   char line[MAXLINELENGHT];
   while (fgets(line, sizeof(line), fp) != NULL) {
-    int result = parse_line(data->entries +data->n , line);
+    int result = parse_line(data->entries + data->n, line);
     if (result == E_SAM_HEADER_LINE) {
-      int err = parse_header(data->headers +data->header_n, line);
+      int err = parse_header(data->headers + data->header_n, line);
       if (err != E_SUCCESS)
         continue;
       data->header_n++;
       if (data->header_n == data->header_cap) {
         data->header_cap *= 2;
         struct sq_header **tmph = (struct sq_header **)realloc(
-            data->headers, data->header_cap * sizeof(struct sq_header*));
+            data->headers, data->header_cap * sizeof(struct sq_header *));
         if (tmph == NULL) {
           free_sam(data);
           fclose(fp);
@@ -65,7 +65,7 @@ int parse_sam(struct sam_file **sam, char *file) {
     if (data->n == data->capacity) {
       data->capacity *= 2;
       struct sam_entry **tmp = (struct sam_entry **)realloc(
-          data->entries, data->capacity * sizeof(struct sam_entry*));
+          data->entries, data->capacity * sizeof(struct sam_entry *));
       if (tmp == NULL) {
         free_sam(data);
         fclose(fp);
@@ -84,9 +84,7 @@ int parse_line(struct sam_entry **entry, char *line) {
   const int num_entries = 11;
   const char header_line_marker = '@';
 
-  struct sam_entry *e = (struct sam_entry*)malloc(sizeof(sam_entry));
-
-
+  struct sam_entry *e = (struct sam_entry *)malloc(sizeof(struct sam_entry));
 
   char *start = line;
   char *end = NULL;
@@ -191,7 +189,7 @@ int parse_header(struct sq_header **header, char *line) {
   const int marker_length = 3;
   const char seperator = '\t';
 
-  struct sq_header *h = (struct sq_header*)malloc(sizeof(sq_header));
+  struct sq_header *h = (struct sq_header *)malloc(sizeof(struct sq_header));
 
   if (strncmp(line, sq_header_marker, marker_length) != 0) {
     return E_SAM_NON_SQ_HEADER;
@@ -261,7 +259,7 @@ int free_sam_entry(struct sam_entry *e) {
   return E_SUCCESS;
 };
 
-int free_sam_header(struct sam_header* h){
+int free_sam_header(struct sq_header *h) {
   free(h->sn);
   free(h);
   return E_SUCCESS;

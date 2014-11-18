@@ -1,9 +1,8 @@
 #include <stddef.h>
+#include "defs.h"
 
 #ifndef PARSE_SAM_H
 #define PARSE_SAM_H
-
-
 
 struct sq_header {
   char *sn;
@@ -53,6 +52,6 @@ int parse_line(struct sam_entry **entry, char *line);
 int parse_header(struct sq_header **header, char *line);
 int free_sam(struct sam_file *sam);
 int free_sam_entry(struct sam_entry *e);
-int free_sam_header(struct sam_header* h);
+int free_sam_header(struct sq_header *h);
 
 #endif

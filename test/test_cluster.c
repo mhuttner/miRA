@@ -4,21 +4,6 @@
 #include "../src/errors.h"
 #include "testerino.h"
 
-int create_test_clusters_from_sam(struct cluster_list **list) {
-  struct sam_file sam;
-  sam.n = 4;
-  sam.capacity = 4;
-  struct sam_entry test_entries[] = {
-      {"abc", 0, "chrom_2", 120, 0, "", "", 0, 0, "ABCDEFGHIJKLMN", ""},
-      {"abc", 0, "chrom_2", 100, 0, "", "", 0, 0, "ABCDEFGHIJKLMN", ""},
-      {"abc", 0x10, "chrom_2", 150, 0, "", "", 0, 0, "ABCDEFGHIJKLMN", ""},
-      {"abc", 0, "chrom_1", 10, 0, "", "", 0, 0, "ABCDEFGHIJKLMN", ""}};
-  sam.entries = test_entries;
-
-  int err = create_clusters(list, &sam);
-  return err;
-}
-
 int create_test_clusters(struct cluster_list **list, int n, char *strands,
                          char *chromosomes[], long *starts, long *ends,
                          long *reads, long *flank_starts, long *flank_ends) {
@@ -26,8 +11,8 @@ int create_test_clusters(struct cluster_list **list, int n, char *strands,
       (struct cluster_list *)malloc(sizeof(struct cluster_list));
   tmp->n = n;
   tmp->capacity = n;
-  struct cluster *clusters =
-      (struct cluster *)malloc(n * sizeof(struct cluster));
+  struct cluster **clusters =
+      (struct cluster **)malloc(n * sizeof(struct cluster *));
   tmp->clusters = clusters;
 
   char default_strand = '+';
@@ -39,7 +24,7 @@ int create_test_clusters(struct cluster_list **list, int n, char *strands,
   long default_flank_end = 200;
   struct cluster *c = NULL;
   for (size_t i = 0; i < tmp->n; i++) {
-    c = tmp->clusters + i;
+    c = (struct cluster *)malloc(sizeof(struct cluster));
     c->id = i;
     c->strand = default_strand;
     c->chrom = (char *)malloc(21 * sizeof(char));
@@ -70,17 +55,10 @@ int create_test_clusters(struct cluster_list **list, int n, char *strands,
     if (flank_ends != NULL) {
       c->flank_end = flank_ends[i];
     }
+    tmp->clusters[i] = c;
   }
   *list = tmp;
   return E_SUCCESS;
-}
-
-void test_create_clusters(struct test *t) {
-  t_set_msg(t, "Testing conversion of sam entries to clusters...");
-  struct cluster_list *list = NULL;
-  int err = create_test_clusters_from_sam(&list);
-  t_assert_msg(t, err == E_SUCCESS, "Creating clusters failed");
-  free_clusters(list);
 }
 
 void test_sort_clusters(struct test *t) {
@@ -91,10 +69,10 @@ void test_sort_clusters(struct test *t) {
   long ends[4] = {20, 40, 25, 20};
   create_test_clusters(&list, 4, strands, NULL, starts, ends, NULL, NULL, NULL);
   sort_clusters(list, compare_strand_chrom_start);
-  t_assert_msg(t, list->clusters[0].id == 3, "Wrong cluster order");
-  t_assert_msg(t, list->clusters[1].id == 2, "Wrong cluster order");
-  t_assert_msg(t, list->clusters[2].id == 1, "Wrong cluster order");
-  t_assert_msg(t, list->clusters[3].id == 0, "Wrong cluster order");
+  t_assert_msg(t, list->clusters[0]->id == 3, "Wrong cluster order");
+  t_assert_msg(t, list->clusters[1]->id == 2, "Wrong cluster order");
+  t_assert_msg(t, list->clusters[2]->id == 1, "Wrong cluster order");
+  t_assert_msg(t, list->clusters[3]->id == 0, "Wrong cluster order");
   free_clusters(list);
 }
 
@@ -109,7 +87,7 @@ void test_merge_clusters(struct test *t) {
   t_assert_msg(t, err == E_SUCCESS, "merging failed");
   struct cluster *c;
   for (size_t i = 0; i < list->n; i++) {
-    c = list->clusters + i;
+    c = list->clusters[i];
     t_log(t, "%ld %ld %ld \n", c->id, c->start, c->end);
   }
   t_assert_msg(t, list->n == 3, "Merging failed");
@@ -130,7 +108,7 @@ void test_filter_clusters(struct test *t) {
   t_assert_msg(t, list->n == 2, "Filtering incorrect");
   struct cluster *c;
   for (size_t i = 0; i < list->n; i++) {
-    c = list->clusters + i;
+    c = list->clusters[i];
     t_assert_msg(t, c->readcount >= 10,
                  "Cluster with not enough reads in result");
   }
@@ -152,11 +130,13 @@ void test_merge_extended_clusters(struct test *t) {
   t_assert_msg(t, err == E_SUCCESS, "Merging failed");
   struct cluster *c = NULL;
   for (size_t i = 0; i < list->n; i++) {
-    c = list->clusters + i;
+    c = list->clusters[i];
     t_log(t, "%ld %c %s %ld %ld %ld %ld %ld \n", c->id, c->strand, c->chrom,
           c->start, c->end, c->readcount, c->flank_start, c->flank_end);
   }
+  t_assert_msg(t, list->clusters[0]->start == 410, "Merging incorrect");
+  t_assert_msg(t, list->clusters[0]->flank_start == 100, "Merging incorrect");
+  t_assert_msg(t, list->clusters[0]->flank_end == 600, "Merging incorrect");
 
-  t_fail(t, "");
   free_clusters(list);
 }

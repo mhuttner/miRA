@@ -6,6 +6,8 @@
 *.o
 *.trs
 .deps/
+data/
+src/ViennaRNA-2.1.8
 
 Makefile
 configure

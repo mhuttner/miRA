@@ -10,7 +10,6 @@ int main(int argc, char const *argv[]) {
   suite_add_test(s, test_header_line);
   suite_add_test(s, test_invalid_line);
   suite_add_test(s, test_multiple_consecutive_tabs);
-  suite_add_test(s, test_create_clusters);
   suite_add_test(s, test_sort_clusters);
   suite_add_test(s, test_merge_clusters);
   suite_add_test(s, test_filter_clusters);

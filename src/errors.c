@@ -10,6 +10,8 @@ struct _errordesc errordesc[] = {
     {E_INVALID_ARGUMENT, "Invalid commad line argument"},
     {E_SAM_NON_SQ_HEADER, "The Line is a Header Line that was ignored"},
     {E_CHROMOSOME_NOT_FOUND, "The Chromosome was not found as a @SQ entry"},
+    {E_FILE_WRITING_FAILED, "Failed to write the output File"},
+    {E_INVALID_BED_LINE, "The line of the BED file is invalid"},
     {E_MALLOC_FAIL, "malloc failed, check available memory"},
     {E_REALLOC_FAIL, "realloc failed, check available memory"},
     {E_UNKNOWN, "An unknown error occured"}};

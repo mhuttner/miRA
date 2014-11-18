@@ -19,6 +19,7 @@ int help(int argc, char **argv) {
          "The most commonly used commands are:\n"
          "    cluster    generate list of main expression contigs based on \n"
          "               alignment data.\n"
+         "    fold       calculate secondary rna structure\n"
          "    help       show this help message\n"
          "\n",
          PACKAGE, PACKAGE_VERSION);
