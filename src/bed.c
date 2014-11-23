@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include "errors.h"
 #include "cluster.h"
-#include "bed_file_io.h"
+#include "bed.h"
 #include "defs.h"
 
 int write_bed_file(char *filename, struct cluster_list *list) {
@@ -99,32 +99,46 @@ int parse_bed_line(struct cluster **result, char *line) {
     free(tokens);
     return E_INVALID_BED_LINE;
   }
-  /* discard unneeded tokens */
-  free(tokens[4]);
-  free(tokens[8]);
 
   char *check = NULL;
+  c->chrom = tokens[0];
+  c->start = strtol(tokens[1], &check, 10);
+  if (check == tokens[1] || *check != 0) {
+    goto line_invalid;
+  }
+
+  c->end = strtol(tokens[2], &check, 10);
+  if (check == tokens[2] || *check != 0) {
+    goto line_invalid;
+  }
+  /*skip the name of the cluster and only parse the id */
+  c->id = strtol(tokens[3] + 8, &check, 10);
+  if (check == tokens[3] + 8 || *check != 0) {
+    goto line_invalid;
+  }
+
+  free(tokens[4]);
+  c->strand = *tokens[5];
+  c->flank_start = strtol(tokens[6], &check, 10);
+  if (check == tokens[6] || *check != 0) {
+    goto line_invalid;
+  }
+  c->flank_start = strtol(tokens[7], &check, 10);
+  if (check == tokens[7] || *check != 0) {
+    goto line_invalid;
+  }
+  free(tokens[8]);
+  c->readcount = strtol(tokens[9], &check, 10);
+  if (check == tokens[9] || *check != 0) {
+    goto line_invalid;
+  }
+  *result = c;
 
   return E_SUCCESS;
+line_invalid:
+  for (int i = 0; i < num_entries; i++) {
+    free(tokens[i]);
+  }
+  free(tokens);
+  return E_INVALID_BED_LINE;
 }
-/*
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-*/

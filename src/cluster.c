@@ -4,7 +4,7 @@
 #include <getopt.h>
 #include "cluster.h"
 #include "parse_sam.h"
-#include "bed_file_io.h"
+#include "bed.h"
 #include "errors.h"
 #include "string.h"
 #include "uthash.h"

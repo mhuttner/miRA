@@ -1,3 +1,5 @@
+#include "cluster.h"
+
 #ifndef BED_FILE_IO_H
 #define BED_FILE_IO_H
 

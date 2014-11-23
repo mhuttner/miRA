@@ -23,6 +23,7 @@ config.log
 config.status
 
 miRA
+miRAtest
 check_cluster
 check_parse_sam
 src/.deps/
