@@ -4,6 +4,7 @@
 #include "test_cluster.h"
 #include "test_bed_file_io.h"
 #include "test_fasta.h"
+#include "test_vfold.h"
 
 int main(int argc, char const *argv[]) {
   struct test_suite *s = NULL;
@@ -21,6 +22,7 @@ int main(int argc, char const *argv[]) {
   suite_add_test(s, test_invalid_id_bed_line);
   suite_add_test(s, test_strip_newlines);
   suite_add_test(s, test_read_fasta_file);
+  suite_add_test(s, test_reverse_complement);
   suite_run_all_tests(s);
   free_suite(s);
   return 0;

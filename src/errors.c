@@ -14,6 +14,9 @@ struct _errordesc errordesc[] = {
     {E_INVALID_BED_LINE, "The line of the BED file is invalid"},
     {E_UNKNOWN_FILE_IO_ERROR, "An unknown error occurred reading a file"},
     {E_INVALID_FASTA_FILE, "Given fasta file is invalid"},
+    {E_NEEDED_SEQUENCE_NOT_FOUND,
+     "A fasta sequence needed for folding was not found"},
+    {E_INVALID_FASTA_SEQUENCE_LENGTH, "Cluster out of genome range"},
     {E_MALLOC_FAIL, "malloc failed, check available memory"},
     {E_REALLOC_FAIL, "realloc failed, check available memory"},
     {E_UNKNOWN, "An unknown error occured"}};

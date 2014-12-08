@@ -30,7 +30,6 @@ struct chrom_info {
 };
 
 int cluster(int argc, char **argv);
-int print_help();
 
 int parse_clusters(struct chrom_info **table, struct cluster_list **list,
                    char *file);

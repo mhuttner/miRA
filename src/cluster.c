@@ -9,6 +9,8 @@
 #include "string.h"
 #include "uthash.h"
 
+static int print_help();
+
 int cluster(int argc, char **argv) {
   int c;
   int gap_size = 10;
@@ -139,7 +141,7 @@ error_clusters:
   return err;
 }
 
-int print_help() {
+static int print_help() {
   printf("Description:\n"
          "    cluster generates a list of main expression contigs based on\n"
          "    alignment data.\n"

@@ -17,7 +17,7 @@ void test_valid_bed_line(struct test *t) {
   if (result != E_SUCCESS)
     return;
   t_assert_msg(t, strcmp(c->chrom, "scaffold_1") == 0, "Chromsome read wrong");
-  t_assert_msg(t, c->end == 186647, "Cluster end wrong");
+  t_assert_msg(t, c->end == 186447, "Cluster end wrong");
   t_assert_msg(t, c->id == 0, "Cluster Id wrong");
   t_assert_msg(t, c->strand == '+', "Strand wrong");
   free_cluster(c);

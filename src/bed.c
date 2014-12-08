@@ -45,9 +45,29 @@ int read_bed_file(struct cluster_list **list, char *filename) {
   struct cluster *c = NULL;
   while (fgets(line, sizeof(line), fp) != NULL) {
     err = parse_bed_line(&c, line);
+    if (err) {
+      free(tmp_list->clusters);
+      free(tmp_list);
+      fclose(fp);
+      return err;
+    }
+    tmp_list->clusters[tmp_list->n] = c;
+    tmp_list->n++;
+    if (tmp_list->n == tmp_list->capacity) {
+      tmp_list->capacity *= 2;
+      struct cluster **tmp = (struct cluster **)realloc(
+          tmp_list->clusters, tmp_list->capacity * sizeof(struct cluster *));
+      if (tmp == NULL) {
+        free(tmp_list->clusters);
+        free(tmp_list);
+        fclose(fp);
+        return E_REALLOC_FAIL;
+      }
+      tmp_list->clusters = tmp;
+    }
   }
   fclose(fp);
-
+  *list = tmp_list;
   return E_SUCCESS;
 }
 
@@ -102,12 +122,12 @@ int parse_bed_line(struct cluster **result, char *line) {
 
   char *check = NULL;
   c->chrom = tokens[0];
-  c->start = strtol(tokens[1], &check, 10);
+  c->flank_start = strtol(tokens[1], &check, 10);
   if (check == tokens[1] || *check != 0) {
     goto line_invalid;
   }
 
-  c->end = strtol(tokens[2], &check, 10);
+  c->flank_end = strtol(tokens[2], &check, 10);
   if (check == tokens[2] || *check != 0) {
     goto line_invalid;
   }
@@ -119,11 +139,11 @@ int parse_bed_line(struct cluster **result, char *line) {
 
   free(tokens[4]);
   c->strand = *tokens[5];
-  c->flank_start = strtol(tokens[6], &check, 10);
+  c->start = strtol(tokens[6], &check, 10);
   if (check == tokens[6] || *check != 0) {
     goto line_invalid;
   }
-  c->flank_start = strtol(tokens[7], &check, 10);
+  c->end = strtol(tokens[7], &check, 10);
   if (check == tokens[7] || *check != 0) {
     goto line_invalid;
   }
