@@ -1,7 +1,7 @@
 ACLOCAL_AMFLAGS = -I m4 --install
 bin_PROGRAMS = miRA
 miRA_SOURCES = src/main.c src/help.c src/cluster.c src/parse_sam.c src/errors.c src/vfold.c src/bed.c src/fasta.c
-miRA_CFLAGS = -std=c11 -I src/Lfold/
+miRA_CFLAGS = -std=c11
 miRA_CPPFLAGS = -DDEBUG
 miRA_LDADD = libLfold.a
 

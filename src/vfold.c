@@ -7,7 +7,7 @@
 #include "fasta.h"
 #include "cluster.h"
 #include "bed.h"
-#include "lfold.h"
+#include "Lfold/lFold.h"
 
 static int print_help();
 
