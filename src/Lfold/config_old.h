@@ -97,34 +97,49 @@
 #define HAVE__BOOL 1
 
 /* Name of package */
-#define PACKAGE "miRA"
+#define PACKAGE "ViennaRNA"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "michael@mhuttner.com"
+#define PACKAGE_BUGREPORT "rna@tbi.univie.ac.at"
 
 /* Define to the full name of this package. */
-#define PACKAGE_NAME "miRA"
+#define PACKAGE_NAME "ViennaRNA"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "miRA 0.1"
+#define PACKAGE_STRING "ViennaRNA 2.1.5"
 
 /* Define to the one symbol short name of this package. */
-#define PACKAGE_TARNAME "miRA"
+#define PACKAGE_TARNAME "ViennaRNA"
 
 /* Define to the home page for this package. */
-#define PACKAGE_URL "http://mhuttner.com/"
+#define PACKAGE_URL "http://www.tbi.univie.ac.a/~ivo/RNA"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "0.1"
+#define PACKAGE_VERSION "2.1.5"
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
 
+/* only for gcc */
+#define UNUSED __attribute__((unused))
+
+/* Compute z-scores for RNALfold */
+//#define USE_SVM 1
+
 /* Version number of package */
-#define VERSION "0.1"
+#define VERSION "2.1.5"
+
+/* Analyse{Dists,Seqs} */
+/* #undef WITH_CLUSTER */
 
 /* Define if using the dmalloc debugging malloc package */
 /* #undef WITH_DMALLOC */
+
+/* Create the perl interface to RNAlib */
+#define WITH_PERL_INTERFACE 1
+
+/* Create the python interface to RNAlib */
+/* #undef WITH_PYTHON_INTERFACE */
 
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #undef const */

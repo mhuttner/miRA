@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <getopt.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include "vfold.h"
 #include "errors.h"
 #include "fasta.h"
@@ -135,10 +137,12 @@ int map_clusters(struct sequence_list **seq_list, struct cluster_list *c_list,
 }
 int fold_sequences(struct sequence_list *seq_list) {
   struct foldable_sequence *fs = NULL;
-  for (size_t i = 0; i < 10; i++) {
+
+  for (size_t i = 92; i < seq_list->n; i++) {
     fs = seq_list->sequences[i];
     Lfold(fs->seq, NULL, fs->n);
   }
+
   return E_SUCCESS;
 };
 
@@ -151,7 +155,7 @@ int reverse_complement(struct foldable_sequence *s) {
     return E_MALLOC_FAIL;
   }
   size_t k = s->n - 1;
-  tmp[k + 1] = 0;
+  tmp[k--] = 0;
   for (size_t i = 0; i < s->n; i++) {
     for (int j = 0; j < pairs_n; j++) {
       if (s->seq[i] == pairs[j][0]) {

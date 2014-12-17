@@ -8,10 +8,10 @@ void test_reverse_complement(struct test *t) {
                    "GCACAGCCCAGAGGGT";
   char expected[] = "ACCCTCTGGGCTGTGCCCAGCGATGAGGAGGGGCATGCCTGACCATGGTGCGGGCGGG"
                     "TCTAGGGGGAATCTGCC";
-  s.n = strlen(testseq);
-  s.seq = (char *)malloc((s.n + 1) * sizeof(char));
-  memcpy(s.seq, testseq, s.n + 1);
-  s.seq[s.n] = 0;
+  s.n = strlen(testseq) + 1;
+  s.seq = (char *)malloc((s.n) * sizeof(char));
+  memcpy(s.seq, testseq, s.n);
+  s.seq[s.n - 1] = 0;
 
   reverse_complement(&s);
   t_log(t, "Got:      %s\n", s.seq);

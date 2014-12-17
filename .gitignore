@@ -24,6 +24,7 @@ config.status
 
 miRA
 miRAtest
+libLfold.a
 check_cluster
 check_parse_sam
 src/.deps/

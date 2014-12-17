@@ -16,6 +16,7 @@ struct _errordesc errordesc[] = {
     {E_INVALID_FASTA_FILE, "Given fasta file is invalid"},
     {E_NEEDED_SEQUENCE_NOT_FOUND,
      "A fasta sequence needed for folding was not found"},
+    {E_CREATING_PIPE_FAILED, "A file descriptor pipe could not be created"},
     {E_INVALID_FASTA_SEQUENCE_LENGTH, "Cluster out of genome range"},
     {E_MALLOC_FAIL, "malloc failed, check available memory"},
     {E_REALLOC_FAIL, "realloc failed, check available memory"},
