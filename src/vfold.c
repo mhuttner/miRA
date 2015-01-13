@@ -2,28 +2,44 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
+#include <math.h>
+#include "float.h"
 #include "vfold.h"
 #include "errors.h"
 #include "fasta.h"
 #include "cluster.h"
+#include "defs.h"
 #include "bed.h"
+#include "util.h"
 #include "Lfold/Lfold.h"
+#include "Lfold/fold.h"
+#include "structure_evaluation.h"
 
 static int print_help();
 
 int vfold(int argc, char *argv[]) {
+  srand(time(NULL));
   int c;
-  char default_output_file[] = "contigs.bed";
+  int log_level = LOG_LEVEL_BASIC;
+  char default_output_file[] = "output.miRA";
   char *output_file = default_output_file;
+  char *config_file = NULL;
 
-  while ((c = getopt(argc, argv, "o:h")) != -1) {
+  while ((c = getopt(argc, argv, "c:o:hvq")) != -1) {
     switch (c) {
+    case 'c':
+      config_file = optarg;
     case 'o':
       output_file = optarg;
       break;
     case 'h':
       print_help();
       return E_SUCCESS;
+    case 'v':
+      log_level = LOG_LEVEL_VERBOSE;
+    case 'q':
+      log_level = LOG_LEVEL_QUIET;
     default:
       break;
     }
@@ -33,6 +49,10 @@ int vfold(int argc, char *argv[]) {
     print_help();
     return E_NO_FILE_SPECIFIED;
   }
+  struct configuration_params *config = NULL;
+  initialize_configuration(&config, config_file);
+  log_configuration(config);
+
   struct cluster_list *c_list = NULL;
   struct genome_sequence *seq_table = NULL;
   struct sequence_list *seq_list = NULL;
@@ -54,7 +74,9 @@ int vfold(int argc, char *argv[]) {
   /*clusters freed by map_clusters */
   free_sequence_table(seq_table);
 
-  fold_sequences(seq_list);
+  fold_sequences(seq_list, config);
+
+  free_sequence_list(seq_list);
 
   return E_SUCCESS;
 map_error:
@@ -118,6 +140,8 @@ int map_clusters(struct sequence_list **seq_list, struct cluster_list *c_list,
     memcpy(fs->seq, gs->data + c->flank_start, l);
     fs->seq[l] = 0;
     fs->n = l + 1;
+
+    fs->structure = NULL;
     if (c->strand == '-') {
       int err = reverse_complement(fs);
       if (err) {
@@ -135,16 +159,196 @@ int map_clusters(struct sequence_list **seq_list, struct cluster_list *c_list,
 
   return E_SUCCESS;
 }
-int fold_sequences(struct sequence_list *seq_list) {
+int fold_sequences(struct sequence_list *seq_list,
+                   struct configuration_params *config) {
   struct foldable_sequence *fs = NULL;
+  struct structure_list *s_list = NULL;
 
-  for (size_t i = 92; i < seq_list->n; i++) {
+  log_basic(config->log_level, "Initializing folding...\n");
+  for (size_t i = 0; i < seq_list->n; i++) {
+    log_basic(config->log_level, "\rFolding sequence %5ld \\%5ld", i + 1,
+              seq_list->n);
+    fflush(stdout);
     fs = seq_list->sequences[i];
-    Lfold(fs->seq, NULL, fs->n);
+    int max_length = fs->n;
+    if (config->max_precursor_length > 0 &&
+        config->max_precursor_length < max_length) {
+      max_length = config->max_precursor_length;
+    }
+    Lfold(&s_list, fs->seq, max_length);
+    find_optimal_structure(s_list, fs, config);
+    free_structure_list(s_list);
+    evaluate_structure(fs);
+
+    calculate_mfe_distribution(fs, config->permutation_count);
+    write_foldable_sequence(NULL, fs);
   }
+  log_basic(config->log_level, "Folding done.");
 
   return E_SUCCESS;
 };
+
+int calculate_mfe_distribution(struct foldable_sequence *fs,
+                               int permutation_count) {
+  if (fs->structure == NULL) {
+    return E_NO_STRUCTURE;
+  }
+  char *seq_copy = (char *)malloc((fs->n + 1) * sizeof(char));
+  if (seq_copy == NULL) {
+    return E_MALLOC_FAIL;
+  }
+  double *mfe_list = (double *)malloc(permutation_count * sizeof(double));
+  if (mfe_list == NULL) {
+    free(seq_copy);
+    return E_MALLOC_FAIL;
+  }
+  char *tmp = (char *)malloc((fs->n + 1) * sizeof(char));
+  if (tmp == NULL) {
+    free(seq_copy);
+    free(mfe_list);
+    return E_MALLOC_FAIL;
+  }
+
+  memcpy(seq_copy, fs->seq, fs->n);
+  seq_copy[fs->n] = 0;
+
+  for (int i = 0; i < permutation_count; i++) {
+    fisher_yates_shuffle(seq_copy, fs->n);
+    mfe_list[i] = fold(seq_copy, tmp) / fs->n;
+  }
+
+  struct structure_info *si = fs->structure;
+  double mfe_mean = mean(mfe_list, permutation_count);
+  double mfe_sd = sd(mfe_list, permutation_count, mfe_mean);
+  double mfe_pvalue = pvalue(mfe_mean, mfe_sd, si->mfe);
+  si->mean = mfe_mean;
+  si->sd = mfe_sd;
+  si->pvalue = mfe_pvalue;
+  free(mfe_list);
+  free(tmp);
+  free(seq_copy);
+
+  return E_SUCCESS;
+}
+
+int find_optimal_structure(struct structure_list *s_list,
+                           struct foldable_sequence *fs,
+                           struct configuration_params *config) {
+  struct secondary_structure *ss = NULL;
+  struct secondary_structure *best_ss = NULL;
+  double min_mfe = DBL_MAX;
+  struct cluster *c = fs->c;
+  u64 local_core_start = c->start - c->flank_start;
+  /* offset du to bed file format */
+  u64 local_core_end = c->end - c->flank_start - 1;
+  for (size_t i = 0; i < s_list->n; i++) {
+    ss = s_list->structures[i];
+    /*the string should always be null terminated, if not the library would have
+     * failed already */
+    size_t l = strlen(ss->structure_string);
+    if (ss->start > local_core_start + 1) {
+      continue;
+    }
+    if (ss->start + l - 1 < local_core_end + 1) {
+      continue;
+    }
+    double mfe_per_bp = ss->mfe / (double)l;
+    if (mfe_per_bp < min_mfe) {
+      best_ss = ss;
+      min_mfe = mfe_per_bp;
+    }
+  }
+  if (best_ss == NULL) {
+    fs->structure = NULL;
+    return E_NO_OPTIMAL_STRUCTURE_FOUND;
+  }
+  size_t n = strlen(best_ss->structure_string);
+  fs->structure =
+      (struct structure_info *)malloc(sizeof(struct structure_info));
+  if (fs->structure == NULL) {
+    return E_MALLOC_FAIL;
+  }
+
+  char *st_string = (char *)malloc((n + 1) * sizeof(char));
+  if (st_string == NULL) {
+    free(fs->structure);
+    return E_MALLOC_FAIL;
+  }
+
+  memcpy(st_string, best_ss->structure_string, n);
+  st_string[n] = 0;
+  fs->structure->structure_string = st_string;
+  fs->structure->n = n;
+  fs->structure->start = best_ss->start;
+  fs->structure->mfe = min_mfe;
+
+  return E_SUCCESS;
+}
+
+int check_folding_constraints(struct foldable_sequence *fs,
+                              struct configuration_params *config) {
+  struct structure_info *si = fs->structure;
+  if (si->n < config->min_precursor_length) {
+    si->is_valid = 0;
+    return E_STRUCTURE_IS_INVALID;
+  }
+
+  return E_SUCCESS;
+}
+
+int write_foldable_sequence(FILE *fp, struct foldable_sequence *fs) {
+  if (fp == NULL) {
+    fp = stdout;
+  }
+  struct cluster *c = fs->c;
+  struct structure_info *si = fs->structure;
+  if (si == NULL) {
+    return E_NO_STRUCTURE;
+  }
+
+  long structure_start;
+  long structure_end;
+  if (c->strand == '+') {
+    /*0 based */
+    structure_start = si->start - 1 + c->flank_start;
+    structure_end = structure_start + si->n;
+  } else {
+    /*0 based */
+    structure_end = c->flank_end - (si->start - 1);
+    structure_start = structure_end - si->n;
+  }
+  char *structure_sequence = (char *)malloc((si->n + 1) * sizeof(char));
+  if (structure_sequence == NULL) {
+    return E_MALLOC_FAIL;
+  }
+  memcpy(structure_sequence, fs->seq + si->start - 1, si->n);
+  structure_sequence[si->n] = 0;
+
+  fprintf(fp, "\nCluster_%lld_%s:{\n", c->id,
+          (c->strand == '-') ? "minus" : "plus");
+  fprintf(fp, "\t\"chromosome\":\"%s\",\n", c->chrom);
+  fprintf(fp, "\t\"structure_start\":%ld,\n", structure_start);
+  fprintf(fp, "\t\"structure_end\":%ld,\n", structure_end);
+  fprintf(fp, "\t\"structure_length\":%ld,\n", si->n);
+  fprintf(fp, "\t\"strand\":\"%c\",\n", c->strand);
+  fprintf(fp, "\t\"sequence\":%s,\n", structure_sequence);
+  fprintf(fp, "\t\"structure\":\"%s\",\n", si->structure_string);
+  fprintf(fp, "\t\"mfe\":\"%7.5lf kcal/mol/bp\",\n", si->mfe);
+  fprintf(fp, "\t\"external_loops\":%d,\n", si->external_loop_count);
+  fprintf(fp, "\t\"longest_stem_0mm\":\"%d (nt %d-%d)\",\n",
+          si->stem_end - si->stem_start + 1, si->stem_start, si->stem_end);
+  fprintf(fp, "\t\"longest_stem_1mm\":\"%d (nt %d-%d)\",\n",
+          si->stem_end_with_mismatch - si->stem_start_with_mismatch + 1,
+          si->stem_start_with_mismatch, si->stem_end_with_mismatch);
+  fprintf(fp, "\t\"paired_fraction\":%7.5lf,\n", si->paired_fraction);
+  fprintf(fp, "\t\"mfe_mean\":%7.5lf,\n", si->mean);
+  fprintf(fp, "\t\"mfe_sd\":%7.5lf,\n", si->sd);
+  fprintf(fp, "\t\"mfe_precise\":%8lf,\n", si->mfe);
+  fprintf(fp, "\t\"z_value\":%7.5lf,\n", (si->mfe - si->mean) / si->sd);
+  fprintf(fp, "\t\"p_value\":%7.5le,\n", si->pvalue);
+  fprintf(fp, "}\n");
+  return E_SUCCESS;
+}
 
 int reverse_complement(struct foldable_sequence *s) {
   const char *pairs[] = {"AT", "GC", "UA", "YR", "SS",
@@ -173,6 +377,33 @@ int reverse_complement(struct foldable_sequence *s) {
 
   return E_SUCCESS;
 }
+/* Generates a uniformly distributed random integer in the range [0,max) */
+int get_rand_int(int max) {
+  /* make sure the random the possible amount of random numbers is a mutiple of
+   * max to get a uniform distribution */
+  int limit = RAND_MAX - RAND_MAX % max;
+  int random_number;
+  do {
+    random_number = rand();
+  } while (random_number >= limit);
+  return random_number % max;
+}
+int fisher_yates_shuffle(char *seq, int n) {
+  int j;
+  char tmp;
+  for (int i = n - 1; i > 0; i--) {
+    j = get_rand_int(i + 1);
+    tmp = seq[j];
+    seq[j] = seq[i];
+    seq[i] = tmp;
+  }
+  return E_SUCCESS;
+}
+int free_structure_info(struct structure_info *info) {
+  free(info->structure_string);
+  free(info);
+  return E_SUCCESS;
+}
 
 int free_sequence_list(struct sequence_list *seq_list) {
   for (size_t i = 0; i < seq_list->n; i++) {
@@ -188,6 +419,9 @@ int free_foldable_sequence(struct foldable_sequence *s) {
   }
   free_cluster(s->c);
   free(s->seq);
+  if (s->structure != NULL) {
+    free_structure_info(s->structure);
+  }
   free(s);
   return E_SUCCESS;
 }

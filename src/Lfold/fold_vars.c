@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "fold_vars.h"
+#include "fold.h"
 
 int circ = 0;
 
@@ -63,8 +64,6 @@ int canonicalBPonly =
 int *strand;
 
 int gquad = 0; /* consider g-qudruplexes in the calculations */
-
-int logML = 0;
 
 PUBLIC char *option_string(void) {
   static char options[100];

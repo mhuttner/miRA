@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdarg.h>
 #include "errors.h"
 
 struct _errordesc errordesc[] = {
@@ -18,6 +19,8 @@ struct _errordesc errordesc[] = {
      "A fasta sequence needed for folding was not found"},
     {E_CREATING_PIPE_FAILED, "A file descriptor pipe could not be created"},
     {E_INVALID_FASTA_SEQUENCE_LENGTH, "Cluster out of genome range"},
+    {E_NO_OPTIMAL_STRUCTURE_FOUND,
+     "No secondary Structure containing the core region found"},
     {E_MALLOC_FAIL, "malloc failed, check available memory"},
     {E_REALLOC_FAIL, "realloc failed, check available memory"},
     {E_UNKNOWN, "An unknown error occured"}};

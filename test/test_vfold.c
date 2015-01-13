@@ -21,3 +21,11 @@ void test_reverse_complement(struct test *t) {
   // t_fail(t, "always");
   free(s.seq);
 }
+
+void test_folding(struct test *t) {
+  t_set_msg(t, "Testing libRNA folding...");
+  char *fake_argv[] = {"fold", "test/data/contigs.bed", "test/data/Chlre3.fa"};
+  int fake_argc = 3;
+  vfold(fake_argc, fake_argv);
+  t_fail(t, "always");
+}

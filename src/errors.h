@@ -17,6 +17,9 @@ enum _error {
   E_NEEDED_SEQUENCE_NOT_FOUND = -12,
   E_INVALID_FASTA_SEQUENCE_LENGTH = -13,
   E_CREATING_PIPE_FAILED = -14,
+  E_NO_OPTIMAL_STRUCTURE_FOUND = -15,
+  E_NO_STRUCTURE = -16,
+  E_STRUCTURE_IS_INVALID = -17,
 
   E_MALLOC_FAIL = -30,
   E_REALLOC_FAIL = -31,
@@ -27,7 +30,6 @@ struct _errordesc {
   int code;
   const char *message;
 };
-
 int print_error(int err);
 
 #endif

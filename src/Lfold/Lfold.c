@@ -24,11 +24,6 @@
 #include "gquad.h"
 #include "Lfold.h"
 
-#ifdef USE_SVM
-#include "svm.h"
-#include "svm_utils.h"
-#endif
-
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -66,24 +61,14 @@ PRIVATE char **ptype = NULL; /* precomputed array of pair types */
 PRIVATE short *S = NULL, *S1 = NULL;
 PRIVATE unsigned int length;
 PRIVATE char *prev = NULL;
-#ifdef USE_SVM
-PRIVATE struct svm_model *avg_model = NULL;
-PRIVATE struct svm_model *sd_model = NULL;
-#endif
 
 PRIVATE int with_gquad = 0;
 PRIVATE int **ggg = NULL;
 
 #ifdef _OPENMP
 
-#ifdef USE_SVM
-#pragma omp threadprivate(P, c, cc, cc1, f3, fML, Fmi, DMLi, DMLi1, DMLi2,     \
-                          ptype, S, S1, length, sd_model, avg_model, ggg,      \
-                          with_gquad, prev)
-#else
 #pragma omp threadprivate(P, c, cc, cc1, f3, fML, Fmi, DMLi, DMLi1, DMLi2,     \
                           ptype, S, S1, length, ggg, with_gquad, prev)
-#endif
 
 #endif
 
@@ -99,7 +84,102 @@ PRIVATE void free_arrays(int maxdist);
 PRIVATE void make_ptypes(const short *S, int i, int maxdist, int n);
 PRIVATE char *backtrack(const char *sequence, int start, int maxdist);
 PRIVATE int fill_arrays(const char *sequence, int maxdist, int zsc,
-                        double min_z);
+                        double min_z, struct structure_list *s_list);
+
+/*
+#################################
+# CUSTOM FUNCTIONS              #
+#################################
+*/
+
+int create_structure_list(struct structure_list **list) {
+  int err = 0;
+  const size_t INITIAL_SIZE = 100;
+  struct structure_list *tmp_list =
+      (struct structure_list *)malloc(sizeof(struct structure_list));
+  if (tmp_list == NULL) {
+    err = 1;
+    goto cleanup;
+  }
+  tmp_list->n = 0;
+  tmp_list->capacity = INITIAL_SIZE;
+  tmp_list->structures = (struct secondary_structure **)malloc(
+      tmp_list->capacity * sizeof(struct secondary_structure *));
+  if (tmp_list->structures == NULL) {
+    err = 1;
+    goto cleanup;
+  }
+  *list = tmp_list;
+  return 0;
+cleanup:
+  if (tmp_list != NULL && tmp_list->structures != NULL) {
+    free(tmp_list->structures);
+  }
+
+  if (tmp_list != NULL) {
+    free(tmp_list);
+  }
+
+  return err;
+}
+int save_secondary_structure(struct structure_list *list,
+                             char *structure_string, double mfe, int start) {
+  int err = 0;
+  struct secondary_structure *s =
+      (struct secondary_structure *)malloc(sizeof(struct secondary_structure));
+  if (s == NULL) {
+    err = 1;
+    goto cleanup;
+  }
+  /* use evil strlen since the library would fail for a non terminated string
+   * anyway */
+  int n = strlen(structure_string);
+  s->structure_string = (char *)malloc((n + 1) * sizeof(char));
+  if (s->structure_string == NULL) {
+    err = 1;
+    goto cleanup;
+  }
+  memcpy(s->structure_string, structure_string, n);
+  s->structure_string[n] = 0;
+  s->mfe = mfe;
+  s->start = start;
+
+  if (list->n >= list->capacity) {
+    list->capacity *= 2;
+    struct secondary_structure **tmp =
+        realloc(list->structures,
+                list->capacity * sizeof(struct secondary_structure *));
+    if (tmp == NULL) {
+      err = 1;
+      goto cleanup;
+    }
+    list->structures = tmp;
+  }
+  list->structures[list->n] = s;
+  list->n++;
+
+  return 0;
+
+cleanup:
+  if (s != NULL && s->structure_string != NULL) {
+    free(s->structure_string);
+  }
+  if (s != NULL) {
+    free(s);
+  }
+  return err;
+}
+
+void free_structure_list(struct structure_list *list) {
+  for (size_t i = 0; i < list->n; i++) {
+    free_secondary_structure(list->structures[i]);
+  }
+  free(list);
+}
+void free_secondary_structure(struct secondary_structure *s) {
+  free(s->structure_string);
+  free(s);
+}
 
 /*
 #################################
@@ -176,12 +256,13 @@ PRIVATE void free_arrays(int maxdist) {
 
 /*--------------------------------------------------------------------------*/
 
-PUBLIC float Lfold(const char *string, char *structure, int maxdist) {
-  return Lfoldz(string, structure, maxdist, 0, 0.0);
+PUBLIC float Lfold(struct structure_list **result, const char *string,
+                   int maxdist) {
+  return Lfoldz(result, string, maxdist, 0, 0.0);
 }
 
-PUBLIC float Lfoldz(const char *string, char *structure, int maxdist, int zsc,
-                    double min_z) {
+PUBLIC float Lfoldz(struct structure_list **result, const char *string,
+                    int maxdist, int zsc, double min_z) {
   int i, energy;
 
   length = (int)strlen(string);
@@ -198,21 +279,23 @@ PUBLIC float Lfoldz(const char *string, char *structure, int maxdist, int zsc,
   for (i = length; i >= (int)length - (int)maxdist - 4 && i > 0; i--)
     make_ptypes(S, i, maxdist, length);
 
-#ifdef USE_SVM /*svm*/
-  if (zsc) {
-    avg_model = svm_load_model_string(avg_model_string);
-    sd_model = svm_load_model_string(sd_model_string);
-  }
-#endif
+  /*
+   *############################################################################
+   *                   modified here
+   *############################################################################
+  */
+  struct structure_list *s_list = NULL;
+  create_structure_list(&s_list);
 
-  energy = fill_arrays(string, maxdist, zsc, min_z);
+  energy = fill_arrays(string, maxdist, zsc, min_z, s_list);
 
-#ifdef USE_SVM /*svm*/
-  if (zsc) {
-    svm_destroy_model(avg_model);
-    svm_destroy_model(sd_model);
-  }
-#endif
+  *result = s_list;
+
+  /*
+   *############################################################################
+   *                   end of modification
+   *############################################################################
+  */
 
   free(S);
   free(S1);
@@ -221,8 +304,8 @@ PUBLIC float Lfoldz(const char *string, char *structure, int maxdist, int zsc,
   return (float)energy / 100.;
 }
 
-PRIVATE int fill_arrays(const char *string, int maxdist, int zsc,
-                        double min_z) {
+PRIVATE int fill_arrays(const char *string, int maxdist, int zsc, double min_z,
+                        struct structure_list *s_list) {
   /* fill "c", "fML" and "f3" arrays and return  optimal energy */
 
   int i, j, k, length, energy;
@@ -232,6 +315,10 @@ PRIVATE int fill_arrays(const char *string, int maxdist, int zsc,
   int lind;
 
   length = (int)strlen(string);
+  /* modified */
+  char *secondary_structure_buffer =
+      (char *)malloc((length + 1) * sizeof(char));
+
   prev = NULL;
   for (j = 0; j < maxdist + 5; j++)
     Fmi[j] = DMLi[j] = DMLi1[j] = DMLi2[j] = INF;
@@ -641,55 +728,7 @@ PRIVATE int fill_arrays(const char *string, int maxdist, int zsc,
         if (!traced2)
           nrerror("backtrack failed in short backtrack 1");
         if (zsc) {
-#ifdef USE_SVM
-          int info_avg;
-          double average_free_energy;
-          double sd_free_energy;
-          double my_z;
-          int *AUGC =
-              get_seq_composition(S, lind - 1, MIN2((pairpartner + 1), length));
-          /*\svm*/
-          average_free_energy =
-              avg_regression(AUGC[0], AUGC[1], AUGC[2], AUGC[3], AUGC[4],
-                             avg_model, &info_avg);
-          if (info_avg == 0) {
-            double difference;
-            double min_sd =
-                minimal_sd(AUGC[0], AUGC[1], AUGC[2], AUGC[3], AUGC[4]);
-            difference =
-                (fij - f3[pairpartner + 1]) / 100. - average_free_energy;
-            if (difference - (min_z * min_sd) <= 0.0001) {
-              sd_free_energy = sd_regression(AUGC[0], AUGC[1], AUGC[2], AUGC[3],
-                                             AUGC[4], sd_model);
-              my_z = difference / sd_free_energy;
-              if (my_z <= min_z) {
-                ss = backtrack(string, lind, pairpartner + 1);
-                if (prev) {
-                  if ((i + strlen(ss) < prev_i + strlen(prev)) ||
-                      strncmp(ss + prev_i - i, prev,
-                              strlen(prev))) { /* ss does not contain prev */
-                    if (dangles == 2) {
-                      printf(".%s (%6.2f) %4d z= %.3f\n", prev,
-                             (f3[prev_i] - f3[prev_i + strlen(prev) - 1]) /
-                                 100.,
-                             prev_i - 1, prevz);
-                    } else {
-                      printf("%s (%6.2f) %4d z=%.3f\n ", prev,
-                             (f3[prev_i] - f3[prev_i + strlen(prev)]) / 100.,
-                             prev_i, prevz);
-                    }
-                  }
-                  free(prev);
-                }
-                prev = ss;
-                prev_i = lind;
-                prevz = my_z;
-              }
-            }
-          }
-          free(AUGC);
-          do_backtrack = 0;
-#endif
+
         } else {
           /* original code for Lfold*/
           ss = backtrack(string, lind, pairpartner + 1);
@@ -698,12 +737,23 @@ PRIVATE int fill_arrays(const char *string, int maxdist, int zsc,
                 strncmp(ss + prev_i - i, prev, strlen(prev))) {
               /* ss does not contain prev */
               if (dangles == 2) {
-                printf(".%s (%6.2f) %4d\n", prev,
-                       (f3[prev_i] - f3[prev_i + strlen(prev) - 1]) / 100.,
-                       prev_i - 1);
+                sprintf(secondary_structure_buffer, ".%s", prev);
+                save_secondary_structure(
+                    s_list, secondary_structure_buffer,
+                    (f3[prev_i] - f3[prev_i + strlen(prev) - 1]) / 100.,
+                    prev_i - 1);
+
+                // printf(".%s (%6.2f) %4d\n", prev,
+                //        (f3[prev_i] - f3[prev_i + strlen(prev) - 1]) / 100.,
+                //        prev_i - 1);
               } else {
-                printf("%s (%6.2f) %4d\n", prev,
-                       (f3[prev_i] - f3[prev_i + strlen(prev)]) / 100., prev_i);
+                sprintf(secondary_structure_buffer, "%s", prev);
+                save_secondary_structure(
+                    s_list, secondary_structure_buffer,
+                    (f3[prev_i] - f3[prev_i + strlen(prev)]) / 100., prev_i);
+                // printf("%s (%6.2f) %4d\n", prev,
+                //        (f3[prev_i] - f3[prev_i + strlen(prev)]) / 100.,
+                //        prev_i);
               }
             }
             free(prev);
@@ -729,12 +779,24 @@ PRIVATE int fill_arrays(const char *string, int maxdist, int zsc,
             prev = NULL;
           } else {
             if (dangles == 2) {
-              printf(".%s (%6.2f) %4d\n", prev,
-                     (f3[prev_i] - f3[prev_i + strlen(prev) - 1]) / 100.,
-                     prev_i - 1);
+              sprintf(secondary_structure_buffer, ".%s", prev);
+              save_secondary_structure(
+                  s_list, secondary_structure_buffer,
+                  (f3[prev_i] - f3[prev_i + strlen(prev) - 1]) / 100.,
+                  prev_i - 1);
+
+              // printf(".%s (%6.2f) %4d\n", prev,
+              //        (f3[prev_i] - f3[prev_i + strlen(prev) - 1]) / 100.,
+              //        prev_i - 1);
             } else {
-              printf("%s (%6.2f) %4d\n", prev,
-                     (f3[prev_i] - f3[prev_i + strlen(prev)]) / 100., prev_i);
+              sprintf(secondary_structure_buffer, "%s", prev);
+              save_secondary_structure(
+                  s_list, secondary_structure_buffer,
+                  (f3[prev_i] - f3[prev_i + strlen(prev)]) / 100., prev_i);
+
+              // printf("%s (%6.2f) %4d\n", prev,
+              //        (f3[prev_i] - f3[prev_i + strlen(prev)]) / 100.,
+              //        prev_i);
             }
           }
         } else if ((f3[i] < 0) && (!zsc))
@@ -828,40 +890,19 @@ PRIVATE int fill_arrays(const char *string, int maxdist, int zsc,
             nrerror("backtrack failed in short backtrack 2");
 
           if (zsc) {
-#ifdef USE_SVM
-            int *AUGC = get_seq_composition(S, lind - 1,
-                                            MIN2((pairpartner + 1), length));
-            average_free_energy =
-                avg_regression(AUGC[0], AUGC[1], AUGC[2], AUGC[3], AUGC[4],
-                               avg_model, &info_avg);
-            if (info_avg == 0) {
-              double difference;
-              double min_sd =
-                  minimal_sd(AUGC[0], AUGC[1], AUGC[2], AUGC[3], AUGC[4]);
-              difference =
-                  (fij - f3[pairpartner + 1]) / 100. - average_free_energy;
-              if (difference - (min_z * min_sd) <= 0.0001) {
-                sd_free_energy = sd_regression(AUGC[0], AUGC[1], AUGC[2],
-                                               AUGC[3], AUGC[4], sd_model);
-                my_z = difference / sd_free_energy;
-                if (my_z <= min_z) {
-                  ss = backtrack(string, lind, pairpartner + 1);
-                  printf("%s (%6.2f) %4d z= %.2f\n", ss,
-                         (f3[lind] - f3[lind + strlen(ss) - 1]) / 100., lind,
-                         my_z);
-                }
-              }
-            }
-            free(AUGC);
-#endif
+
           } else {
             ss = backtrack(string, lind, pairpartner + 1);
             if (dangles == 2) {
-              printf("%s (%6.2f) %4d\n", ss,
-                     (f3[lind] - f3[lind + strlen(ss) - 1]) / 100., 1);
+              save_secondary_structure(
+                  s_list, ss, (f3[lind] - f3[lind + strlen(ss) - 1]) / 100., 1);
+              // printf("%s (%6.2f) %4d\n", ss,
+              //        (f3[lind] - f3[lind + strlen(ss) - 1]) / 100., 1);
             } else {
-              printf("%s (%6.2f) %4d\n", ss,
-                     (f3[lind] - f3[lind + strlen(ss)]) / 100., 1);
+              save_secondary_structure(
+                  s_list, ss, (f3[lind] - f3[lind + strlen(ss)]) / 100., 1);
+              // printf("%s (%6.2f) %4d\n", ss,
+              //        (f3[lind] - f3[lind + strlen(ss)]) / 100., 1);
             }
             free(ss);
           }
@@ -902,6 +943,8 @@ PRIVATE int fill_arrays(const char *string, int maxdist, int zsc,
       }
     }
   }
+  /* modified */
+  free(secondary_structure_buffer);
 
   return f3[1];
 }

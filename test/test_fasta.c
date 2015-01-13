@@ -20,7 +20,7 @@ void test_strip_newlines(struct test *t) {
 void test_read_fasta_file(struct test *t) {
   t_set_msg(t, "Testing reading a fasta File...");
   struct genome_sequence *sequence_table = NULL;
-  char filename[30] = "test/test.fasta";
+  char filename[30] = "test/data/test.fasta";
   int err = read_fasta_file(&sequence_table, filename);
   t_assert_msg(t, err == E_SUCCESS, "Parsing failed");
   t_log(t, "Error: %d\n", err);
