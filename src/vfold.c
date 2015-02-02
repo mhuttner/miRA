@@ -15,6 +15,7 @@
 #include "Lfold/Lfold.h"
 #include "Lfold/fold.h"
 #include "structure_evaluation.h"
+#include "candidates.h"
 
 static int print_help();
 
@@ -22,7 +23,7 @@ int vfold(int argc, char *argv[]) {
   srand(time(NULL));
   int c;
   int log_level = LOG_LEVEL_BASIC;
-  char default_output_file[] = "output.miRA";
+  char default_output_file[] = "output.json";
   char *output_file = default_output_file;
   char *config_file = NULL;
 
@@ -30,6 +31,7 @@ int vfold(int argc, char *argv[]) {
     switch (c) {
     case 'c':
       config_file = optarg;
+      break;
     case 'o':
       output_file = optarg;
       break;
@@ -74,11 +76,23 @@ int vfold(int argc, char *argv[]) {
   /*clusters freed by map_clusters */
   free_sequence_table(seq_table);
 
-  fold_sequences(seq_list, config);
+  err = fold_sequences(seq_list, config);
+  if (err) {
+    goto fold_error;
+  }
+  err = write_json_result(seq_list, output_file);
+  if (err) {
+    goto write_error;
+  }
 
   free_sequence_list(seq_list);
 
   return E_SUCCESS;
+write_error:
+fold_error:
+  free_sequence_list(seq_list);
+  print_error(err);
+  return err;
 map_error:
   free_sequence_table(seq_table);
   print_error(err);
@@ -178,13 +192,62 @@ int fold_sequences(struct sequence_list *seq_list,
     Lfold(&s_list, fs->seq, max_length);
     find_optimal_structure(s_list, fs, config);
     free_structure_list(s_list);
+    if (fs->structure == NULL) {
+      continue;
+    }
     evaluate_structure(fs);
 
+    check_folding_constraints(fs, config);
+    if (fs->structure->is_valid == 0) {
+      printf(" Invalid %ld\n", i);
+      continue;
+    }
+    printf("Valid %ld\n", i);
     calculate_mfe_distribution(fs, config->permutation_count);
-    write_foldable_sequence(NULL, fs);
+    check_pvalue(fs, config);
+    if (fs->structure->is_valid == 0) {
+      continue;
+    }
+    if (config->log_level == LOG_LEVEL_VERBOSE) {
+      write_foldable_sequence(NULL, fs);
+    }
   }
   log_basic(config->log_level, "Folding done.");
 
+  return E_SUCCESS;
+};
+
+int write_json_result(struct sequence_list *seq_list, char *filename) {
+  FILE *fp = fopen(filename, "w");
+  if (fp == NULL) {
+    return E_UNKNOWN_FILE_IO_ERROR;
+  }
+  fprintf(fp, "{\n");
+  for (size_t i = 0; i < seq_list->n - 1; i++) {
+    if (seq_list->sequences[i]->structure->is_valid == 0) {
+      continue;
+    }
+    write_foldable_sequence(fp, seq_list->sequences[i]);
+    fprintf(fp, ",\n");
+  }
+  write_foldable_sequence(fp, seq_list->sequences[seq_list->n - 1]);
+  fprintf(fp, "}");
+  fclose(fp);
+  return E_SUCCESS;
+}
+int write_serialized_result(struct sequence_list *seq_list, char *filename) {
+  FILE *fp = fopen(filename, "w");
+  if (fp == NULL) {
+    return E_UNKNOWN_FILE_IO_ERROR;
+  }
+
+  for (size_t i = 0; i < seq_list->n; i++) {
+    if (seq_list->sequences[i]->structure->is_valid == 0) {
+      continue;
+    }
+    write_serialized_foldable_sequence(fp, seq_list->sequences[i]);
+  }
+  fclose(fp);
   return E_SUCCESS;
 };
 
@@ -289,10 +352,31 @@ int check_folding_constraints(struct foldable_sequence *fs,
                               struct configuration_params *config) {
   struct structure_info *si = fs->structure;
   if (si->n < config->min_precursor_length) {
-    si->is_valid = 0;
+    goto invalid_structure;
+  }
+  if (si->external_loop_count >= config->max_hairpin_count) {
+    goto invalid_structure;
+  }
+  if (abs(si->stem_end_with_mismatch - si->stem_start_with_mismatch) + 1 <
+      config->min_double_strand_length) {
+    goto invalid_structure;
+  }
+  if (si->mfe >= config->min_mfe_per_nt) {
+    goto invalid_structure;
+  }
+  si->is_valid = 1;
+  return E_SUCCESS;
+
+invalid_structure:
+  si->is_valid = 0;
+  return E_STRUCTURE_IS_INVALID;
+}
+int check_pvalue(struct foldable_sequence *fs,
+                 struct configuration_params *config) {
+  if (fs->structure->pvalue > config->max_pvalue) {
+    fs->structure->is_valid = 0;
     return E_STRUCTURE_IS_INVALID;
   }
-
   return E_SUCCESS;
 }
 
@@ -324,14 +408,14 @@ int write_foldable_sequence(FILE *fp, struct foldable_sequence *fs) {
   memcpy(structure_sequence, fs->seq + si->start - 1, si->n);
   structure_sequence[si->n] = 0;
 
-  fprintf(fp, "\nCluster_%lld_%s:{\n", c->id,
+  fprintf(fp, "\"Cluster_%lld_%s\":{\n", c->id,
           (c->strand == '-') ? "minus" : "plus");
   fprintf(fp, "\t\"chromosome\":\"%s\",\n", c->chrom);
   fprintf(fp, "\t\"structure_start\":%ld,\n", structure_start);
   fprintf(fp, "\t\"structure_end\":%ld,\n", structure_end);
   fprintf(fp, "\t\"structure_length\":%ld,\n", si->n);
   fprintf(fp, "\t\"strand\":\"%c\",\n", c->strand);
-  fprintf(fp, "\t\"sequence\":%s,\n", structure_sequence);
+  fprintf(fp, "\t\"sequence\":\"%s\",\n", structure_sequence);
   fprintf(fp, "\t\"structure\":\"%s\",\n", si->structure_string);
   fprintf(fp, "\t\"mfe\":\"%7.5lf kcal/mol/bp\",\n", si->mfe);
   fprintf(fp, "\t\"external_loops\":%d,\n", si->external_loop_count);
@@ -346,7 +430,51 @@ int write_foldable_sequence(FILE *fp, struct foldable_sequence *fs) {
   fprintf(fp, "\t\"mfe_precise\":%8lf,\n", si->mfe);
   fprintf(fp, "\t\"z_value\":%7.5lf,\n", (si->mfe - si->mean) / si->sd);
   fprintf(fp, "\t\"p_value\":%7.5le,\n", si->pvalue);
-  fprintf(fp, "}\n");
+  fprintf(fp, "}");
+  return E_SUCCESS;
+}
+
+int write_serialized_foldable_sequence(FILE *fp, struct foldable_sequence *fs) {
+  if (fp == NULL) {
+    fp = stdout;
+  }
+  struct cluster *c = fs->c;
+  struct structure_info *si = fs->structure;
+  if (si == NULL) {
+    return E_NO_STRUCTURE;
+  }
+
+  long structure_start;
+  long structure_end;
+  if (c->strand == '+') {
+    /*0 based */
+    structure_start = si->start - 1 + c->flank_start;
+    structure_end = structure_start + si->n;
+  } else {
+    /*0 based */
+    structure_end = c->flank_end - (si->start - 1);
+    structure_start = structure_end - si->n;
+  }
+  char *structure_sequence = (char *)malloc((si->n + 1) * sizeof(char));
+  if (structure_sequence == NULL) {
+    return E_MALLOC_FAIL;
+  }
+  memcpy(structure_sequence, fs->seq + si->start - 1, si->n);
+  structure_sequence[si->n] = 0;
+
+  fprintf(fp, "Cluster_%lld_%s\t", c->id,
+          (c->strand == '-') ? "minus" : "plus");
+  fprintf(fp, "%s\t", c->chrom);
+  fprintf(fp, "%c\t", c->strand);
+  fprintf(fp, "%ld\t", structure_start);
+  fprintf(fp, "%ld\t", structure_end);
+  fprintf(fp, "%s\t", structure_sequence);
+  fprintf(fp, "%s\t", si->structure_string);
+  fprintf(fp, "%7.5f\t", si->mfe);
+  fprintf(fp, "%9.7e\t", si->pvalue);
+  fprintf(fp, "%7.5e\t", si->mean);
+  fprintf(fp, "%7.5e\n", si->sd);
+
   return E_SUCCESS;
 }
 

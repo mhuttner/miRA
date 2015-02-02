@@ -40,12 +40,19 @@ int map_clusters(struct sequence_list **seq_list, struct cluster_list *c_list,
                  struct genome_sequence *seq_table);
 int fold_sequences(struct sequence_list *seq_list,
                    struct configuration_params *config);
+int write_json_result(struct sequence_list *seq_list, char *filename);
+int write_serialized_result(struct sequence_list *seq_list, char *filename);
 int calculate_mfe_distribution(struct foldable_sequence *fs,
                                int permutation_count);
 int find_optimal_structure(struct structure_list *s_list,
                            struct foldable_sequence *fs,
                            struct configuration_params *config);
+int check_folding_constraints(struct foldable_sequence *fs,
+                              struct configuration_params *config);
+int check_pvalue(struct foldable_sequence *fs,
+                 struct configuration_params *config);
 int write_foldable_sequence(FILE *fp, struct foldable_sequence *fs);
+int write_serialized_foldable_sequence(FILE *fp, struct foldable_sequence *fs);
 int reverse_complement(struct foldable_sequence *s);
 int get_rand_int(int max);
 int fisher_yates_shuffle(char *seq, int n);

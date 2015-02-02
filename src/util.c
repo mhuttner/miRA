@@ -151,7 +151,7 @@ void log_configuration(struct configuration_params *config) {
             config->permutation_count);
   log_basic(config->log_level, "    max_pvalue %lf\n", config->max_pvalue);
   log_basic(config->log_level, "    min_coverage %lf\n", config->min_coverage);
-  log_basic(config->log_level, "    min_paired_fraction %d\n",
+  log_basic(config->log_level, "    min_paired_fraction %lf\n",
             config->min_paired_fraction);
   log_basic(config->log_level, "    min_mature_strand_length %d\n",
             config->min_mature_strand_length);

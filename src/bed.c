@@ -126,38 +126,56 @@ int parse_bed_line(struct cluster **result, char *line) {
   if (check == tokens[1] || *check != 0) {
     goto line_invalid;
   }
+  free(tokens[1]);
+  tokens[1] = NULL;
 
   c->flank_end = strtol(tokens[2], &check, 10);
   if (check == tokens[2] || *check != 0) {
     goto line_invalid;
   }
+  free(tokens[2]);
+  tokens[2] = NULL;
   /*skip the name of the cluster and only parse the id */
   c->id = strtol(tokens[3] + 8, &check, 10);
   if (check == tokens[3] + 8 || *check != 0) {
     goto line_invalid;
   }
+  free(tokens[3]);
+  tokens[3] = NULL;
 
   free(tokens[4]);
+  tokens[4] = NULL;
   c->strand = *tokens[5];
+  free(tokens[5]);
+  tokens[5] = NULL;
   c->start = strtol(tokens[6], &check, 10);
   if (check == tokens[6] || *check != 0) {
     goto line_invalid;
   }
+  free(tokens[6]);
+  tokens[6] = NULL;
   c->end = strtol(tokens[7], &check, 10);
   if (check == tokens[7] || *check != 0) {
     goto line_invalid;
   }
+  free(tokens[7]);
+  tokens[7] = NULL;
   free(tokens[8]);
+  tokens[8] = NULL;
   c->readcount = strtol(tokens[9], &check, 10);
   if (check == tokens[9] || *check != 0) {
     goto line_invalid;
   }
+  free(tokens[9]);
+  tokens[9] = NULL;
   *result = c;
 
   return E_SUCCESS;
 line_invalid:
   for (int i = 0; i < num_entries; i++) {
-    free(tokens[i]);
+    if (tokens[i] != NULL) {
+      free(tokens[i]);
+    }
   }
   free(tokens);
   return E_INVALID_BED_LINE;

@@ -14,11 +14,11 @@ void test_reverse_complement(struct test *t) {
   s.seq[s.n - 1] = 0;
 
   reverse_complement(&s);
+
   t_log(t, "Got:      %s\n", s.seq);
   t_log(t, "Expected: %s\n", expected);
   t_assert_msg(t, strncmp(s.seq, expected, s.n) == 0,
                "Reversing the Sequence failed");
-  // t_fail(t, "always");
   free(s.seq);
 }
 
