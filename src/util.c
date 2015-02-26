@@ -18,10 +18,10 @@ static void set_default_config(struct configuration_params *config) {
   config->permutation_count = 100;
   config->max_pvalue = 0.01;
 
-  config->min_coverage = 0.0;
-  config->min_paired_fraction = 0.0;
-  config->min_mature_strand_length = 0;
-  config->max_mature_strand_length = 0;
+  config->min_coverage = 0.0001;
+  config->min_paired_fraction = 0.67;
+  config->min_mature_strand_length = 18;
+  config->max_mature_strand_length = 30;
   config->allow_three_mismatches = 0;
   config->allow_two_terminal_mismatches = 0;
 }

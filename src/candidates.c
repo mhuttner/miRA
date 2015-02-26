@@ -48,6 +48,9 @@ int convert_seq_list_to_cand_list(struct candidate_list **cand_list,
   struct micro_rna_candidate *cand = NULL;
   for (size_t i = 0; i < seq_list->n; i++) {
     fs = seq_list->sequences[i];
+    if (fs->structure == NULL) {
+      continue;
+    }
     if (fs->structure->is_valid == 0) {
       continue;
     }
@@ -113,6 +116,7 @@ int create_micro_rna_candidate(struct micro_rna_candidate **cand,
   }
   cand_tmp->id = c->id;
   cand_tmp->chrom = chrom_copy;
+  cand_tmp->strand = c->strand;
   cand_tmp->start = structure_start;
   cand_tmp->end = structure_end;
   cand_tmp->sequence = structure_sequence;
@@ -121,6 +125,12 @@ int create_micro_rna_candidate(struct micro_rna_candidate **cand,
   cand_tmp->pvalue = si->pvalue;
   cand_tmp->mean = si->mean;
   cand_tmp->sd = si->sd;
+  cand_tmp->external_loop_count = si->external_loop_count;
+  cand_tmp->paired_fraction = si->paired_fraction;
+  cand_tmp->stem_start = si->stem_start;
+  cand_tmp->stem_end = si->stem_end;
+  cand_tmp->stem_start_with_mismatch = si->stem_start_with_mismatch;
+  cand_tmp->stem_end_with_mismatch = si->stem_end_with_mismatch;
 
   *cand = cand_tmp;
   return E_SUCCESS;
@@ -160,11 +170,19 @@ int write_candidate_line(FILE *fp, struct micro_rna_candidate *cand) {
   fprintf(fp, "%7.5f\t", cand->mfe);
   fprintf(fp, "%9.7e\t", cand->pvalue);
   fprintf(fp, "%7.5e\t", cand->mean);
-  fprintf(fp, "%7.5e\n", cand->sd);
+  fprintf(fp, "%7.5e\t", cand->sd);
+
+  fprintf(fp, "%d\t", cand->external_loop_count);
+  fprintf(fp, "%7.5f\t", cand->paired_fraction);
+  fprintf(fp, "%d\t", cand->stem_start);
+  fprintf(fp, "%d\t", cand->stem_end);
+  fprintf(fp, "%d\t", cand->stem_start_with_mismatch);
+  fprintf(fp, "%d\n", cand->stem_end_with_mismatch);
+
   return E_SUCCESS;
 }
 int read_candidate_file(struct candidate_list **cand_list, char *filename) {
-  static const int MAXLINELENGHT = 2048;
+  static const int MAXLINELENGHT = 4096;
   struct candidate_list *tmp_list = NULL;
   int err = create_empty_candidate_list(&tmp_list);
   if (err) {
@@ -186,13 +204,14 @@ int read_candidate_file(struct candidate_list **cand_list, char *filename) {
     add_candidate_to_list(tmp_list, cand);
   }
   fclose(fp);
+  *cand_list = tmp_list;
 
   return E_SUCCESS;
 }
 
 int parse_candidate_line(struct micro_rna_candidate **cand, char *line) {
   const char seperator = '\t';
-  const int num_entries = 12;
+  const int num_entries = 18;
 
   struct micro_rna_candidate *tmp_cand =
       (struct micro_rna_candidate *)malloc(sizeof(struct micro_rna_candidate));
@@ -290,6 +309,45 @@ int parse_candidate_line(struct micro_rna_candidate **cand, char *line) {
   }
   free(tokens[11]);
   tokens[11] = NULL;
+
+  tmp_cand->external_loop_count = strtol(tokens[12], &check, 10);
+  if (check == tokens[12] || *check != 0) {
+    goto line_invalid;
+  }
+  free(tokens[12]);
+  tokens[12] = NULL;
+
+  tmp_cand->paired_fraction = strtod(tokens[13], &check);
+  if (check == tokens[13] || *check != 0) {
+    goto line_invalid;
+  }
+  free(tokens[13]);
+  tokens[13] = NULL;
+  tmp_cand->stem_start = strtol(tokens[14], &check, 10);
+  if (check == tokens[14] || *check != 0) {
+    goto line_invalid;
+  }
+  free(tokens[14]);
+  tokens[14] = NULL;
+  tmp_cand->stem_end = strtol(tokens[15], &check, 10);
+  if (check == tokens[15] || *check != 0) {
+    goto line_invalid;
+  }
+  free(tokens[15]);
+  tokens[15] = NULL;
+  tmp_cand->stem_start_with_mismatch = strtol(tokens[16], &check, 10);
+  if (check == tokens[16] || *check != 0) {
+    goto line_invalid;
+  }
+  free(tokens[16]);
+  tokens[16] = NULL;
+  tmp_cand->stem_end_with_mismatch = strtol(tokens[17], &check, 10);
+  if (check == tokens[17] || *check != 0) {
+    goto line_invalid;
+  }
+  free(tokens[17]);
+  tokens[17] = NULL;
+
   *cand = tmp_cand;
   return E_SUCCESS;
 line_invalid:

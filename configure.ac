@@ -34,6 +34,11 @@ AC_PROG_RANLIB
 AM_PROG_AR
 AC_PROG_CC
 AM_PROG_CC_C_O
+AX_PROG_JAVA
+if test x$ac_cv_prog_java_works = xyes; then
+	AC_DEFINE([HAVE_JAVA],[1],[Does Java work])
+fi
+AC_DEFINE_UNQUOTED([JAVA_VM_COMMAND],"$ac_cv_prog_JAVA",[Command to call java])
 
 
 

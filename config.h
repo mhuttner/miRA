@@ -13,6 +13,9 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 
+/* Does Java work */
+#define HAVE_JAVA 1
+
 /* Define to 1 if you have the `m' library (-lm). */
 #define HAVE_LIBM 1
 
@@ -95,6 +98,9 @@
 
 /* Define to 1 if the system has the type `_Bool'. */
 #define HAVE__BOOL 1
+
+/* Command to call java */
+#define JAVA_VM_COMMAND "java"
 
 /* Name of package */
 #define PACKAGE "miRA"

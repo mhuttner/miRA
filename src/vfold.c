@@ -23,7 +23,7 @@ int vfold(int argc, char *argv[]) {
   srand(time(NULL));
   int c;
   int log_level = LOG_LEVEL_BASIC;
-  char default_output_file[] = "output.json";
+  char default_output_file[] = "output";
   char *output_file = default_output_file;
   char *config_file = NULL;
 
@@ -58,6 +58,9 @@ int vfold(int argc, char *argv[]) {
   struct cluster_list *c_list = NULL;
   struct genome_sequence *seq_table = NULL;
   struct sequence_list *seq_list = NULL;
+  struct candidate_list *cand_list = NULL;
+  char *json_output_file = NULL;
+  char *mira_output_file = NULL;
   int err;
 
   err = read_bed_file(&c_list, argv[optind]);
@@ -80,15 +83,38 @@ int vfold(int argc, char *argv[]) {
   if (err) {
     goto fold_error;
   }
-  err = write_json_result(seq_list, output_file);
+  json_output_file = (char *)malloc((strlen(output_file) + 6) * sizeof(char));
+  mira_output_file = (char *)malloc((strlen(output_file) + 6) * sizeof(char));
+  if (json_output_file == NULL || mira_output_file == NULL) {
+    err = E_MALLOC_FAIL;
+    goto fold_error;
+  }
+  sprintf(json_output_file, "%s.json", output_file);
+  sprintf(mira_output_file, "%s.miRA", output_file);
+  err = write_json_result(seq_list, json_output_file);
   if (err) {
     goto write_error;
   }
+  printf("1\n");
+  err = convert_seq_list_to_cand_list(&cand_list, seq_list);
+  if (err) {
+    goto convert_error;
+  }
+  printf("2\n");
+  err = write_candidate_file(cand_list, mira_output_file);
+  if (err) {
+    goto convert_error;
+  }
+  free(json_output_file);
+  free(mira_output_file);
 
   free_sequence_list(seq_list);
 
   return E_SUCCESS;
+convert_error:
 write_error:
+  free(json_output_file);
+  free(mira_output_file);
 fold_error:
   free_sequence_list(seq_list);
   print_error(err);
@@ -195,7 +221,7 @@ int fold_sequences(struct sequence_list *seq_list,
     if (fs->structure == NULL) {
       continue;
     }
-    evaluate_structure(fs);
+    evaluate_structure(fs->structure);
 
     check_folding_constraints(fs, config);
     if (fs->structure->is_valid == 0) {
@@ -224,6 +250,9 @@ int write_json_result(struct sequence_list *seq_list, char *filename) {
   }
   fprintf(fp, "{\n");
   for (size_t i = 0; i < seq_list->n - 1; i++) {
+    if (seq_list->sequences[i]->structure == NULL) {
+      continue;
+    }
     if (seq_list->sequences[i]->structure->is_valid == 0) {
       continue;
     }
@@ -235,21 +264,6 @@ int write_json_result(struct sequence_list *seq_list, char *filename) {
   fclose(fp);
   return E_SUCCESS;
 }
-int write_serialized_result(struct sequence_list *seq_list, char *filename) {
-  FILE *fp = fopen(filename, "w");
-  if (fp == NULL) {
-    return E_UNKNOWN_FILE_IO_ERROR;
-  }
-
-  for (size_t i = 0; i < seq_list->n; i++) {
-    if (seq_list->sequences[i]->structure->is_valid == 0) {
-      continue;
-    }
-    write_serialized_foldable_sequence(fp, seq_list->sequences[i]);
-  }
-  fclose(fp);
-  return E_SUCCESS;
-};
 
 int calculate_mfe_distribution(struct foldable_sequence *fs,
                                int permutation_count) {
@@ -431,50 +445,6 @@ int write_foldable_sequence(FILE *fp, struct foldable_sequence *fs) {
   fprintf(fp, "\t\"z_value\":%7.5lf,\n", (si->mfe - si->mean) / si->sd);
   fprintf(fp, "\t\"p_value\":%7.5le,\n", si->pvalue);
   fprintf(fp, "}");
-  return E_SUCCESS;
-}
-
-int write_serialized_foldable_sequence(FILE *fp, struct foldable_sequence *fs) {
-  if (fp == NULL) {
-    fp = stdout;
-  }
-  struct cluster *c = fs->c;
-  struct structure_info *si = fs->structure;
-  if (si == NULL) {
-    return E_NO_STRUCTURE;
-  }
-
-  long structure_start;
-  long structure_end;
-  if (c->strand == '+') {
-    /*0 based */
-    structure_start = si->start - 1 + c->flank_start;
-    structure_end = structure_start + si->n;
-  } else {
-    /*0 based */
-    structure_end = c->flank_end - (si->start - 1);
-    structure_start = structure_end - si->n;
-  }
-  char *structure_sequence = (char *)malloc((si->n + 1) * sizeof(char));
-  if (structure_sequence == NULL) {
-    return E_MALLOC_FAIL;
-  }
-  memcpy(structure_sequence, fs->seq + si->start - 1, si->n);
-  structure_sequence[si->n] = 0;
-
-  fprintf(fp, "Cluster_%lld_%s\t", c->id,
-          (c->strand == '-') ? "minus" : "plus");
-  fprintf(fp, "%s\t", c->chrom);
-  fprintf(fp, "%c\t", c->strand);
-  fprintf(fp, "%ld\t", structure_start);
-  fprintf(fp, "%ld\t", structure_end);
-  fprintf(fp, "%s\t", structure_sequence);
-  fprintf(fp, "%s\t", si->structure_string);
-  fprintf(fp, "%7.5f\t", si->mfe);
-  fprintf(fp, "%9.7e\t", si->pvalue);
-  fprintf(fp, "%7.5e\t", si->mean);
-  fprintf(fp, "%7.5e\n", si->sd);
-
   return E_SUCCESS;
 }
 

@@ -2,8 +2,8 @@
 #include "defs.h"
 #include "vfold.h"
 
-#ifndef COVERAGE_H
-#define COVERAGE_H
+#ifndef CANDIDATES_H
+#define CANDIDATES_H
 
 struct micro_rna_candidate {
   u64 id;
@@ -17,6 +17,13 @@ struct micro_rna_candidate {
   double pvalue;
   double mean;
   double sd;
+
+  int external_loop_count;
+  double paired_fraction;
+  int stem_start;
+  int stem_end;
+  int stem_start_with_mismatch;
+  int stem_end_with_mismatch;
 };
 
 struct candidate_list {

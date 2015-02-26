@@ -6,11 +6,12 @@
 #include "cluster.h"
 #include "vfold.h"
 #include "errors.h"
+#include "coverage.h"
 
 int main(int argc, char **argv) {
   /* List of all available operations */
-  const char *operations[] = {"help", "cluster", "fold"};
-  const int num_operations = 3;
+  const char *operations[] = {"help", "cluster", "fold", "coverage"};
+  const int num_operations = 4;
 
   int operation_type = 0;
   if (argc >= 2) {
@@ -29,6 +30,8 @@ int main(int argc, char **argv) {
     return cluster(argc - 1, argv + 1);
   case 2: /* fold */
     return vfold(argc - 1, argv + 1);
+  case 3: /* coverage */
+    return coverage(argc - 1, argv + 1);
   default:
     break;
   }

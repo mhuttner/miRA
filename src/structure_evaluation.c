@@ -2,8 +2,7 @@
 #include "errors.h"
 #include "structure_evaluation.h"
 
-int evaluate_structure(struct foldable_sequence *fs) {
-  struct structure_info *si = fs->structure;
+int evaluate_structure(struct structure_info *si) {
   if (si == NULL) {
     return E_NO_STRUCTURE;
   }
@@ -17,29 +16,43 @@ int evaluate_structure(struct foldable_sequence *fs) {
 }
 
 int determine_external_loop_count(struct structure_info *si) {
+  return get_loop_count_for_substructure(&(si->external_loop_count),
+                                         si->structure_string, 0, si->n);
+}
+int get_loop_count_for_substructure(int *result, char *structure_string,
+                                    size_t start, size_t end) {
   int loop_count = 0;
   int status = 0;
-  for (int i = 0; i < si->n; i++) {
-    if (si->structure_string[i] == '(') {
+  for (int i = start; i < end; i++) {
+    if (structure_string[i] == '(') {
       status = 1;
     }
-    if (status == 1 && si->structure_string[i] == ')') {
+    if (status == 1 && structure_string[i] == ')') {
       status = 0;
       loop_count++;
     }
   }
-  si->external_loop_count = loop_count;
+  *result = loop_count;
   return E_SUCCESS;
 }
 
 int determine_paired_fraction(struct structure_info *si) {
-  int dot_count = 0;
-  for (int i = 0; i < si->n; i++) {
-    if (si->structure_string[i] == '.') {
+  return get_paired_fraction_for_substructure(&(si->paired_fraction),
+                                              si->structure_string, 0, si->n);
+}
+int get_paired_fraction_for_substructure(double *result, char *structure_string,
+                                         size_t start, size_t end) {
+  if (end <= start) {
+    *result = 0.0;
+    return E_INVALID_RANGE;
+  }
+  size_t dot_count = 0;
+  for (size_t i = start; i < end; i++) {
+    if (structure_string[i] == '.') {
       dot_count++;
     }
   }
-  si->paired_fraction = 1.0 - (double)dot_count / si->n;
+  *result = 1.0 - (double)dot_count / (end - start);
   return E_SUCCESS;
 }
 
