@@ -70,14 +70,17 @@ int coverage(int argc, char **argv) {
     c_list = NULL;
     goto error;
   }
-  err = coverage_test_candidates(ec_list, &cov_table, config);
+  err = coverage_test_candidates(ec_list, &cov_table, sam, config);
   if (err) {
     goto error;
   }
-  err = report_valid_candiates(ec_list);
+  free_sam(sam);
+  err = report_valid_candiates(ec_list, &cov_table);
   if (err) {
     goto error;
   }
+  free_coverage_table(&cov_table);
+  free_extended_candidate_list(ec_list);
   return E_SUCCESS;
 
 error:
@@ -149,6 +152,7 @@ int create_coverage_table(struct chrom_coverage **table, struct sam_file *sam) {
 }
 int coverage_test_candidates(struct extended_candidate_list *cand_list,
                              struct chrom_coverage **coverage_table,
+                             struct sam_file *sam,
                              struct configuration_params *config) {
   struct extended_candidate *ecand = NULL;
   struct micro_rna_candidate *cand = NULL;
@@ -159,7 +163,6 @@ int coverage_test_candidates(struct extended_candidate_list *cand_list,
     ecand = cand_list->candidates[i];
     ecand->is_valid = 0;
     cand = ecand->cand;
-    printf("Cluster %lld\n", cand->id);
     HASH_FIND_STR(*coverage_table, cand->chrom, chrom_cov);
     if (chrom_cov == NULL) {
       return E_CHROMOSOME_NOT_FOUND;
@@ -174,6 +177,10 @@ int coverage_test_candidates(struct extended_candidate_list *cand_list,
     }
     err = find_star_micro_rna(ecand, chrom_cov, config);
     if (err != E_SUCCESS || ecand->star_micro_rna == NULL) {
+      continue;
+    }
+    err = count_unique_reads(ecand, sam);
+    if (err != E_SUCCESS) {
       continue;
     }
     ecand->is_valid = 1;
@@ -512,6 +519,141 @@ int check_for_adjacent_mismatches(struct extended_candidate *ecand) {
   return E_SUCCESS;
 }
 
+int count_unique_reads(struct extended_candidate *ecand, struct sam_file *sam) {
+  const int READCOUNT_FLANK = 30;
+  struct micro_rna_candidate *cand = ecand->cand;
+  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
+  struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
+  struct sam_entry *entry = NULL;
+
+  struct unique_read_list *mature_reads = NULL;
+  struct unique_read_list *star_reads = NULL;
+  create_unique_read_list(&mature_reads);
+  create_unique_read_list(&star_reads);
+  char strand;
+
+  size_t global_mature_start =
+      cand->start + mature_mirna->start - READCOUNT_FLANK;
+  size_t global_mature_end = cand->start + mature_mirna->end + READCOUNT_FLANK;
+  size_t global_star_start = cand->start + star_mirna->start - READCOUNT_FLANK;
+  size_t global_star_end = cand->start + star_mirna->end + READCOUNT_FLANK;
+
+  for (size_t i = 0; i < sam->n; i++) {
+    entry = sam->entries[i];
+    strand = (entry->flag & REV_COMPLM) ? '-' : '+';
+    if (strand != cand->strand) {
+      continue;
+    }
+    if (strcmp(entry->rname, cand->chrom) != 0) {
+      continue;
+    }
+    if (entry->pos >= global_mature_start) {
+      u64 end = entry->pos + strlen(entry->seq);
+      if (end <= global_mature_end) {
+        if (strand == '-') {
+          char *reversed = NULL;
+          reverse_complement_sequence_string(&reversed, entry->seq,
+                                             strlen(entry->seq) + 1);
+          free(entry->seq);
+          entry->seq = reversed;
+        }
+        add_read_to_unique_read_list(mature_reads, entry->pos, entry->seq);
+      }
+    }
+    if (entry->pos >= global_star_start) {
+      u64 end = entry->pos + strlen(entry->seq);
+      if (end <= global_star_end) {
+        if (strand == '-') {
+          char *reversed = NULL;
+          reverse_complement_sequence_string(&reversed, entry->seq,
+                                             strlen(entry->seq) + 1);
+          free(entry->seq);
+          entry->seq = reversed;
+        }
+        add_read_to_unique_read_list(star_reads, entry->pos, entry->seq);
+      }
+    }
+  }
+  ecand->star_reads = star_reads;
+  ecand->mature_reads = mature_reads;
+  return E_SUCCESS;
+}
+
+int create_unique_read(struct unique_read **read, u64 start, const char *seq) {
+  struct unique_read *read_tmp =
+      (struct unique_read *)malloc(sizeof(struct unique_read));
+  if (read_tmp == NULL) {
+    return E_MALLOC_FAIL;
+  }
+  read_tmp->start = start;
+  size_t l = strlen(seq);
+  read_tmp->seq = (char *)malloc((l + 1) * sizeof(char));
+  if (read_tmp->seq == NULL) {
+    free(read_tmp);
+    return E_MALLOC_FAIL;
+  }
+  memcpy(read_tmp->seq, seq, l);
+  read_tmp->seq[l + 1] = 0;
+  read_tmp->end = start + l;
+  read_tmp->count = 1;
+  *read = read_tmp;
+  return E_SUCCESS;
+}
+int create_unique_read_list(struct unique_read_list **ur_list) {
+  const int INITIAL_CAPACITY = 16;
+  struct unique_read_list *ur_list_tmp =
+      (struct unique_read_list *)malloc(sizeof(struct unique_read_list));
+  if (ur_list_tmp == NULL) {
+    return E_MALLOC_FAIL;
+  }
+  ur_list_tmp->capacity = INITIAL_CAPACITY;
+  ur_list_tmp->reads = (struct unique_read **)malloc(
+      ur_list_tmp->capacity * sizeof(struct unique_read *));
+  if (ur_list_tmp->reads == NULL) {
+    free(ur_list_tmp);
+    return E_MALLOC_FAIL;
+  }
+  ur_list_tmp->n = 0;
+  *ur_list = ur_list_tmp;
+  return E_SUCCESS;
+}
+int append_unique_read_list(struct unique_read_list *ur_list,
+                            struct unique_read *read) {
+  if (ur_list->n >= ur_list->capacity) {
+    ur_list->capacity *= 2;
+    struct unique_read **tmp = (struct unique_read **)realloc(
+        ur_list->reads, ur_list->capacity * sizeof(struct unique_read *));
+    if (tmp == NULL) {
+      return E_REALLOC_FAIL;
+    }
+    ur_list->reads = tmp;
+  }
+  ur_list->reads[ur_list->n] = read;
+  ur_list->n++;
+  return E_SUCCESS;
+}
+int add_read_to_unique_read_list(struct unique_read_list *ur_list, u64 start,
+                                 const char *seq) {
+  struct unique_read *read = NULL;
+  for (size_t i = 0; i < ur_list->n; i++) {
+    read = ur_list->reads[i];
+    if (start == read->start && strcmp(seq, read->seq) == 0) {
+      read->count++;
+      return E_SUCCESS;
+    }
+  }
+  int err;
+  err = create_unique_read(&read, start, seq);
+  if (err != E_SUCCESS) {
+    return err;
+  }
+  err = append_unique_read_list(ur_list, read);
+  if (err != E_SUCCESS) {
+    return err;
+  }
+  return E_SUCCESS;
+}
+
 int create_extended_candidate(struct extended_candidate **ecand,
                               struct micro_rna_candidate *cand) {
   struct extended_candidate *ecand_tmp =
@@ -522,6 +664,8 @@ int create_extended_candidate(struct extended_candidate **ecand,
   ecand_tmp->cand = cand;
   ecand_tmp->mature_micro_rna = NULL;
   ecand_tmp->star_micro_rna = NULL;
+  ecand_tmp->mature_reads = NULL;
+  ecand_tmp->star_reads = NULL;
   *ecand = ecand_tmp;
   return E_SUCCESS;
 }
@@ -554,7 +698,25 @@ int free_extended_candidate(struct extended_candidate *ecand) {
   free_micro_rna_candidate(ecand->cand);
   free_candidate_subsequence(ecand->mature_micro_rna);
   free_candidate_subsequence(ecand->star_micro_rna);
+  free_unique_read_list(ecand->mature_reads);
+  free_unique_read_list(ecand->star_reads);
   free(ecand);
+  return E_SUCCESS;
+}
+int free_unique_read_list(struct unique_read_list *ur_list) {
+  if (ur_list == NULL) {
+    return E_SUCCESS;
+  }
+  for (size_t i = 0; i < ur_list->n; i++) {
+    free_unique_read(ur_list->reads[i]);
+  }
+  free(ur_list->reads);
+  free(ur_list);
+  return E_SUCCESS;
+}
+int free_unique_read(struct unique_read *read) {
+  free(read->seq);
+  free(read);
   return E_SUCCESS;
 }
 

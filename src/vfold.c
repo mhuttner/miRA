@@ -449,32 +449,16 @@ int write_foldable_sequence(FILE *fp, struct foldable_sequence *fs) {
 }
 
 int reverse_complement(struct foldable_sequence *s) {
-  const char *pairs[] = {"AT", "GC", "UA", "YR", "SS",
-                         "WW", "KM", "BV", "DH", "NN"};
-  const int pairs_n = 10;
-  char *tmp = (char *)malloc(s->n * sizeof(char));
-  if (tmp == NULL) {
-    return E_MALLOC_FAIL;
-  }
-  size_t k = s->n - 1;
-  tmp[k--] = 0;
-  for (size_t i = 0; i < s->n; i++) {
-    for (int j = 0; j < pairs_n; j++) {
-      if (s->seq[i] == pairs[j][0]) {
-        tmp[k--] = pairs[j][1];
-        break;
-      }
-      if (s->seq[i] == pairs[j][1]) {
-        tmp[k--] = pairs[j][0];
-        break;
-      }
-    }
+  char *reversed = NULL;
+  int err = reverse_complement_sequence_string(&reversed, s->seq, s->n);
+  if (err) {
+    return err;
   }
   free(s->seq);
-  s->seq = tmp;
-
+  s->seq = reversed;
   return E_SUCCESS;
 }
+
 /* Generates a uniformly distributed random integer in the range [0,max) */
 int get_rand_int(int max) {
   /* make sure the random the possible amount of random numbers is a mutiple of

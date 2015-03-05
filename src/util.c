@@ -134,6 +134,32 @@ int initialize_configuration(struct configuration_params **config,
   return E_SUCCESS;
 }
 
+int reverse_complement_sequence_string(char **result, char *seq, size_t n) {
+  const char *pairs[] = {"AT", "GC", "UA", "YR", "SS",
+                         "WW", "KM", "BV", "DH", "NN"};
+  const int pairs_n = 10;
+  char *tmp = (char *)malloc(n * sizeof(char));
+  if (tmp == NULL) {
+    return E_MALLOC_FAIL;
+  }
+  size_t k = n - 1;
+  tmp[k--] = 0;
+  for (size_t i = 0; i < n; i++) {
+    for (int j = 0; j < pairs_n; j++) {
+      if (seq[i] == pairs[j][0]) {
+        tmp[k--] = pairs[j][1];
+        break;
+      }
+      if (seq[i] == pairs[j][1]) {
+        tmp[k--] = pairs[j][0];
+        break;
+      }
+    }
+  }
+  *result = tmp;
+  return E_SUCCESS;
+};
+
 void log_configuration(struct configuration_params *config) {
   log_basic(config->log_level, "Configuartion Parameters:\n");
   log_basic(config->log_level, "    log_level %d\n", config->log_level);

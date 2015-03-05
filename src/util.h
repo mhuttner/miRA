@@ -1,5 +1,7 @@
 
 
+#include <stdlib.h>
+
 #ifndef UTIL_H
 #define UTIL_H
 
@@ -28,6 +30,8 @@ struct configuration_params {
 
 int initialize_configuration(struct configuration_params **config,
                              char *config_file);
+
+int reverse_complement_sequence_string(char **result, char *seq, size_t n);
 
 void log_configuration(struct configuration_params *config);
 void log_basic(int loglevel, const char *msg, ...);
