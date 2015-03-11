@@ -65,4 +65,4 @@ test:	miRAtest
 
 
 
-EXTRA_DIST = m4/NOTES src/Lfold/model_avg.inc src/Lfold/model_sd.inc src/Lfold/circfold.inc VARNAv3-91.jar README.md LICENSE src/Lfold/COPYING test/data/test.config test/data/test.fasta example/sample_reads.sam example/sample_sequence.fasta example/sample_configuration.config
+EXTRA_DIST = m4/NOTES src/Lfold/model_avg.inc src/Lfold/model_sd.inc src/Lfold/circfold.inc VARNAv3-91.jar README.md LICENSE src/Lfold/COPYING test/data/test.config test/data/test.fasta example/sample_reads.sam example/sample_sequence.fasta example/sample_configuration.config example/sample_output
