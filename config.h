@@ -10,11 +10,17 @@
 /* Define to 1 if you have the `floor' function. */
 #define HAVE_FLOOR 1
 
+/* Is a version of gnuplot available */
+#define HAVE_GNUPLOT 1
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 
 /* Does Java work */
 #define HAVE_JAVA 1
+
+/* Is a version of latex available */
+#define HAVE_LATEX 1
 
 /* Define to 1 if you have the `m' library (-lm). */
 #define HAVE_LIBM 1
@@ -112,7 +118,7 @@
 #define PACKAGE_NAME "miRA"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "miRA 0.1"
+#define PACKAGE_STRING "miRA 1.0.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "miRA"
@@ -121,13 +127,13 @@
 #define PACKAGE_URL "http://mhuttner.com/"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "0.1"
+#define PACKAGE_VERSION "1.0.0"
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
 
 /* Version number of package */
-#define VERSION "0.1"
+#define VERSION "1.0.0"
 
 /* Define if using the dmalloc debugging malloc package */
 /* #undef WITH_DMALLOC */

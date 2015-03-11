@@ -54,7 +54,14 @@ int vfold(int argc, char *argv[]) {
   struct configuration_params *config = NULL;
   initialize_configuration(&config, config_file);
   log_configuration(config);
+  int err;
+  err = vfold_main(config, argv[optind], argv[optind + 1], output_file);
+  free(config);
+  return err;
+}
 
+int vfold_main(struct configuration_params *config, char *bed_file,
+               char *fasta_file, char *output_file) {
   struct cluster_list *c_list = NULL;
   struct genome_sequence *seq_table = NULL;
   struct sequence_list *seq_list = NULL;
@@ -62,13 +69,11 @@ int vfold(int argc, char *argv[]) {
   char *json_output_file = NULL;
   char *mira_output_file = NULL;
   int err;
-
-  err = read_bed_file(&c_list, argv[optind]);
+  err = read_bed_file(&c_list, bed_file);
   if (err) {
     goto bed_read_err;
   }
-
-  err = read_fasta_file(&seq_table, argv[optind + 1]);
+  err = read_fasta_file(&seq_table, fasta_file);
   if (err) {
     goto fasta_read_err;
   }
@@ -90,17 +95,15 @@ int vfold(int argc, char *argv[]) {
     goto fold_error;
   }
   sprintf(json_output_file, "%s.json", output_file);
-  sprintf(mira_output_file, "%s.miRA", output_file);
+  sprintf(mira_output_file, "%s", output_file);
   err = write_json_result(seq_list, json_output_file);
   if (err) {
     goto write_error;
   }
-  printf("1\n");
   err = convert_seq_list_to_cand_list(&cand_list, seq_list);
   if (err) {
     goto convert_error;
   }
-  printf("2\n");
   err = write_candidate_file(cand_list, mira_output_file);
   if (err) {
     goto convert_error;
@@ -208,7 +211,6 @@ int fold_sequences(struct sequence_list *seq_list,
   for (size_t i = 0; i < seq_list->n; i++) {
     log_basic(config->log_level, "\rFolding sequence %5ld \\%5ld", i + 1,
               seq_list->n);
-    fflush(stdout);
     fs = seq_list->sequences[i];
     int max_length = fs->n;
     if (config->max_precursor_length > 0 &&
@@ -225,10 +227,8 @@ int fold_sequences(struct sequence_list *seq_list,
 
     check_folding_constraints(fs, config);
     if (fs->structure->is_valid == 0) {
-      printf(" Invalid %ld\n", i);
       continue;
     }
-    printf("Valid %ld\n", i);
     calculate_mfe_distribution(fs, config->permutation_count);
     check_pvalue(fs, config);
     if (fs->structure->is_valid == 0) {
@@ -238,8 +238,6 @@ int fold_sequences(struct sequence_list *seq_list,
       write_foldable_sequence(NULL, fs);
     }
   }
-  log_basic(config->log_level, "Folding done.");
-
   return E_SUCCESS;
 };
 

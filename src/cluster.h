@@ -2,6 +2,7 @@
 #include "parse_sam.h"
 #include "uthash.h"
 #include "defs.h"
+#include "util.h"
 
 #ifndef CLUSTER_H
 #define CLUSTER_H
@@ -30,6 +31,8 @@ struct chrom_info {
 };
 
 int cluster(int argc, char **argv);
+int cluster_main(struct configuration_params *config, char *sam_file,
+                 char *output_file);
 
 int parse_clusters(struct chrom_info **table, struct cluster_list **list,
                    char *file);

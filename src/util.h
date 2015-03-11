@@ -13,6 +13,12 @@ enum log_level {
 
 struct configuration_params {
   int log_level;
+
+  int cluster_gap_size;
+  int cluster_min_reads;
+  int cluster_window_size;
+  int cluster_max_length;
+
   int max_precursor_length;
   int min_precursor_length;
   double min_mfe_per_nt;
@@ -26,12 +32,18 @@ struct configuration_params {
   int max_mature_strand_length;
   int allow_three_mismatches;
   int allow_two_terminal_mismatches;
+
+  int create_coverage_plots;
+  int create_structure_images;
+  int create_coverage_images;
+  int cleanup_auxiliary_files;
 };
 
 int initialize_configuration(struct configuration_params **config,
                              char *config_file);
 
 int reverse_complement_sequence_string(char **result, char *seq, size_t n);
+int create_file_path(char **file_path, const char *path, const char *filename);
 
 void log_configuration(struct configuration_params *config);
 void log_basic(int loglevel, const char *msg, ...);

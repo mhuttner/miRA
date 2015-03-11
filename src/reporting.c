@@ -6,17 +6,28 @@
 #include <stdio.h>
 #include "../config.h"
 #include "math.h"
+#include "util.h"
 
 int report_valid_candiates(struct extended_candidate_list *ec_list,
-                           struct chrom_coverage **coverage_table) {
-  char output_path[] = "./data/output";
+                           struct chrom_coverage **coverage_table,
+                           char *output_path,
+                           struct configuration_params *config) {
+  char bed_result_filename[] = "final_candidates.bed";
+  char *bed_file = NULL;
+  create_file_path(&bed_file, output_path, bed_result_filename);
+  FILE *bed_fp = fopen(bed_file, "w");
+  free(bed_file);
+  char json_result_filename[] = "final_candidates.json";
+  char *json_file = NULL;
+  create_file_path(&json_file, output_path, json_result_filename);
+  FILE *json_fp = fopen(json_file, "w");
+  free(json_file);
+  fprintf(json_fp, "{\n");
+
   struct extended_candidate *ecand = NULL;
   struct chrom_coverage *chrom_cov = NULL;
   for (size_t i = 0; i < ec_list->n; i++) {
     ecand = ec_list->candidates[i];
-    // if (ecand->cand->id != 27) {
-    //   continue;
-    // }
     if (ecand->is_valid != 1) {
       continue;
     }
@@ -24,8 +35,23 @@ int report_valid_candiates(struct extended_candidate_list *ec_list,
     if (chrom_cov == NULL) {
       return E_CHROMOSOME_NOT_FOUND;
     }
-
-    create_candidate_report(ecand, chrom_cov, output_path);
+    create_candidate_report(ecand, chrom_cov, output_path, config);
+    if (bed_fp != NULL) {
+      write_bed_lines(bed_fp, ecand);
+    }
+    if (json_fp != NULL) {
+      write_json_entry(json_fp, ecand);
+      if (i < ec_list->n - 1) {
+        fprintf(json_fp, ",\n");
+      }
+    }
+  }
+  if (bed_fp != NULL) {
+    fclose(bed_fp);
+  }
+  if (json_fp != NULL) {
+    fprintf(json_fp, "}");
+    fclose(json_fp);
   }
 
   return E_SUCCESS;
@@ -33,29 +59,57 @@ int report_valid_candiates(struct extended_candidate_list *ec_list,
 
 int create_candidate_report(struct extended_candidate *ecand,
                             struct chrom_coverage *chrom_cov,
-                            const char *output_path) {
+                            const char *output_path,
+                            struct configuration_params *config) {
   char *cov_plot_file = NULL;
   char *structure_file = NULL;
   char *coverage_file = NULL;
+  char *tex_file = NULL;
+  int err;
 
-  create_coverage_plot(&cov_plot_file, ecand, chrom_cov, output_path);
-
-  int err = E_JAVA_SYSTEM_CALL_FAILED;
+#ifdef HAVE_GNUPLOT
+  if (config->create_coverage_plots) {
+    err = create_coverage_plot(&cov_plot_file, ecand, chrom_cov, output_path);
+    if (err != E_SUCCESS) {
+      cov_plot_file = NULL;
+    }
+  }
+#endif /* HAVE_GNUPLOT */
 #ifdef HAVE_JAVA
-  err = create_structure_image(&structure_file, ecand, output_path);
+  if (config->create_structure_images) {
+    err = create_structure_image(&structure_file, ecand, output_path);
+    if (err != E_SUCCESS) {
+      structure_file = NULL;
+    }
+  }
 #endif /* HAVE_JAVA */
+
+#ifdef HAVE_JAVA
+  if (config->create_coverage_images) {
+    err = create_coverage_image(&coverage_file, ecand, chrom_cov, output_path);
+    if (err != E_SUCCESS) {
+      coverage_file = NULL;
+    }
+  }
+#endif /* HAVE_JAVA */
+  err = create_latex_template(&tex_file, ecand, chrom_cov, cov_plot_file,
+                              structure_file, coverage_file, output_path);
   if (err != E_SUCCESS) {
+    cleanup_auxiliary_files(cov_plot_file, structure_file, coverage_file,
+                            tex_file, config);
     return E_CREATING_REPORT_FAILED;
   }
-  err = E_JAVA_SYSTEM_CALL_FAILED;
-#ifdef HAVE_JAVA
-  err = create_coverage_image(&coverage_file, ecand, chrom_cov, output_path);
-#endif /* HAVE_JAVA */
+
+#ifdef HAVE_LATEX
+  err = compile_tex_file(tex_file, output_path);
   if (err != E_SUCCESS) {
+    cleanup_auxiliary_files(cov_plot_file, structure_file, coverage_file,
+                            tex_file, config);
     return E_CREATING_REPORT_FAILED;
   }
-  err = create_latex_template(ecand, chrom_cov, cov_plot_file, structure_file,
-                              coverage_file, output_path);
+#endif /* HAVE_LATEX */
+  cleanup_auxiliary_files(cov_plot_file, structure_file, coverage_file,
+                          tex_file, config);
 
   return E_SUCCESS;
 }
@@ -142,8 +196,12 @@ int create_coverage_plot(char **result_file, struct extended_candidate *ecand,
           "notitle\"",
           file_path, box1_start, box1_end, box2_start, box2_end, y_max, x_start,
           x_end, x2_start, x2_end, data_file_path);
-  system(gnuplot_system_call);
+  int err = system(gnuplot_system_call);
   free(data_file_path);
+  if (err != E_SUCCESS) {
+    free(file_path);
+    return E_GNUPLOT_SYSTEM_CALL_FAILED;
+  }
   *result_file = file_path;
   return E_SUCCESS;
 }
@@ -193,10 +251,12 @@ int create_structure_image(char **result_file, struct extended_candidate *ecand,
            varna_resolution, m_start, m_end, hex_color_red, s_start, s_end,
            hex_color_blue, cand->id, seq, structure, file_path);
   int err = system(java_system_call);
-  *result_file = file_path;
+
   if (err != 0) {
+    free(file_path);
     return E_JAVA_SYSTEM_CALL_FAILED;
   }
+  *result_file = file_path;
   return E_SUCCESS;
 }
 
@@ -258,14 +318,16 @@ int create_coverage_image(char **result_file, struct extended_candidate *ecand,
            varna_resolution, highlight_string, cand->id, seq, structure,
            file_path);
   int err = system(java_system_call);
-  *result_file = file_path;
+
   if (err != 0) {
+    free(file_path);
     return E_JAVA_SYSTEM_CALL_FAILED;
   }
+  *result_file = file_path;
   return E_SUCCESS;
 }
 
-int create_latex_template(struct extended_candidate *ecand,
+int create_latex_template(char **tex_file, struct extended_candidate *ecand,
                           struct chrom_coverage *chrom_cov,
                           const char *cov_plot_file, const char *structure_file,
                           const char *coverage_file, const char *output_path) {
@@ -303,10 +365,10 @@ int create_latex_template(struct extended_candidate *ecand,
               "\\verb$%lld$ (\\verb$%d$), length = \\verb$%d$\\\\\n"
               "{[}Note: Positions are 1-based and inclusive{]}\\\\\n \\\\\n",
           cand->id, cand->chrom, cand->start, cand->end,
-          cand->start - cand->end, cand->start + mature_mirna->start + 1,
+          cand->start - cand->end, cand->start + mature_mirna->start,
           mature_mirna->start, cand->start + mature_mirna->end,
           mature_mirna->end, mature_mirna->end - mature_mirna->start,
-          (int)mature_mirna->arm, cand->start + star_mirna->start + 1,
+          (int)mature_mirna->arm, cand->start + star_mirna->start,
           star_mirna->start, cand->start + star_mirna->end, star_mirna->end,
           star_mirna->end - star_mirna->start);
   fprintf(fp, "Mature miRNA sequence: \\verb$");
@@ -352,35 +414,53 @@ int create_latex_template(struct extended_candidate *ecand,
           "Mean coverage precursor miRNA: \\verb$%5.4f$ per nucleotide\\\\\n"
           "Mean coverage mature miRNA: \\verb$%5.4f$ per nucleotide\\\\\n"
           "Mean coverage star miRNA: \\verb$%5.4f$ per nucleotide\\\\\n"
-          "Total number of reads for precursor miRNA:\n"
-          "\\begin{center}\n"
-          "\\includegraphics[width=\\textwidth]{%s}\n"
-          "\\end{center}\\newpage\n",
+          "Total number of reads for precursor miRNA:\\\\\\n",
           (double)total_coverage / (cand->end - cand->start),
           (double)mature_mirna->coverage /
               (mature_mirna->end - mature_mirna->start),
-          (double)star_mirna->coverage / (star_mirna->end - star_mirna->start),
-          path_to_filename(cov_plot_file));
+          (double)star_mirna->coverage / (star_mirna->end - star_mirna->start));
+  if (cov_plot_file != NULL) {
+    fprintf(fp, "\\begin{center}\n"
+                "\\includegraphics[width=\\textwidth]{%s}\n"
+                "\\end{center}\\newpage\n",
+            cov_plot_file);
+  } else {
+    fprintf(fp, "{[}Note: Coverage Plot was not included because gnuplot could "
+                "not be found or the gnuplot call failed{]}\\\\\n \\\\\n"
+                "\\newpage\n");
+  }
+
   fprintf(fp, "\\subsection*{Read alignment: Mature sequence}\n");
   write_unique_reads_to_tex(fp, cand, mature_mirna, mature_reads);
   fprintf(fp, "\\newpage\n");
   fprintf(fp, "\\subsection*{Read alignment: Star sequence}\n");
+  fprintf(fp, "\\section*{Structure}\n");
   write_unique_reads_to_tex(fp, cand, star_mirna, star_reads);
-  fprintf(fp, "\\section*{Structure}\n"
-              "\\begin{center}\n"
-              "\\includegraphics[height=\\textheight,width=\\textwidth,"
-              "keepaspectratio]{%s}\n"
-              "\\end{center}\n",
-          path_to_filename(structure_file));
-  fprintf(fp, "\\begin{center}\n"
-              "\\includegraphics[height=\\textheight,width=\\textwidth,"
-              "keepaspectratio]{%s}\n"
-              "\\end{center}\n",
-          path_to_filename(coverage_file));
+  if (structure_file != NULL) {
+    fprintf(fp, "\\begin{center}\n"
+                "\\includegraphics[height=\\textheight,width=\\textwidth,"
+                "keepaspectratio]{%s}\n"
+                "\\end{center}\n",
+            structure_file);
+  } else {
+    fprintf(fp, "{[}Note: Structure was not included because java could "
+                "not be found or the Varna call failed{]}\\\\\n \\\\\n");
+  }
+  if (coverage_file != NULL) {
+    fprintf(fp, "\\begin{center}\n"
+                "\\includegraphics[height=\\textheight,width=\\textwidth,"
+                "keepaspectratio]{%s}\n"
+                "\\end{center}\n",
+            coverage_file);
+  } else {
+    fprintf(fp,
+            "{[}Note: Coverage Structure was not included because java could "
+            "not be found or the Varna call failed{]}\\\\\n \\\\\n");
+  }
   fprintf(fp, "\\end{document}");
 
   fclose(fp);
-  free(file_path);
+  *tex_file = file_path;
   return E_SUCCESS;
 }
 
@@ -430,6 +510,18 @@ int write_unique_reads_to_tex(FILE *fp, struct micro_rna_candidate *cand,
   return E_SUCCESS;
 }
 
+int compile_tex_file(const char *tex_file_path, const char *output_path) {
+  char latex_system_call[2048];
+  sprintf(latex_system_call,
+          "pdflatex -interaction=batchmode -output-directory=\"%s\" %s",
+          output_path, tex_file_path);
+  int err = system(latex_system_call);
+  if (err != 0) {
+    return E_LATEX_SYSTEM_CALL_FAILED;
+  }
+  return E_SUCCESS;
+}
+
 int map_coverage_to_color_index(u32 *result, u32 coverage) {
   if (coverage < 1) {
     coverage = 1;
@@ -446,31 +538,119 @@ int map_coverage_to_color_index(u32 *result, u32 coverage) {
   return E_SUCCESS;
 }
 
-int create_file_path(char **file_path, const char *path, const char *filename) {
-  size_t path_n = strnlen(path, 1024);
-  size_t file_n = strnlen(filename, 1024);
-  if (path_n >= 1024 || file_n >= 1024) {
-    return E_FILE_DESCRIPTOR_TOO_LONG;
+int write_bed_lines(FILE *fp, struct extended_candidate *ecand) {
+  struct micro_rna_candidate *cand = ecand->cand;
+  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
+  struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
+  struct unique_read_list *mature_reads = ecand->mature_reads;
+  struct unique_read_list *star_reads = ecand->star_reads;
+
+  u32 mature_read_count = 0;
+  for (size_t i = 0; i < mature_reads->n; i++) {
+    mature_read_count += mature_reads->reads[i]->count;
   }
-  char *file_path_tmp = (char *)malloc((path_n + file_n + 2) * sizeof(char));
-  if (file_path_tmp == NULL) {
-    return E_MALLOC_FAIL;
+  u32 star_read_count = 0;
+  for (size_t i = 0; i < star_reads->n; i++) {
+    star_read_count += star_reads->reads[i]->count;
   }
-  if (path[path_n - 1] == '/') {
-    sprintf(file_path_tmp, "%s%s", path, filename);
-  } else {
-    sprintf(file_path_tmp, "%s/%s", path, filename);
-  }
-  *file_path = file_path_tmp;
+
+  fprintf(fp, "%s\t%llu\t%llu\tCluster_%lld_precursor\t%d\t%c\t%llu\t%llu\t%"
+              "d\t%d\t%d\t%7.5f\t%9.7e\t%7.5e\t%7.5e\n",
+          cand->chrom, cand->start, cand->end, cand->id, 0, cand->strand,
+          cand->start, cand->end, 0, 0, 0, cand->mfe, cand->pvalue, cand->mean,
+          cand->sd);
+  fprintf(fp, "%s\t%llu\t%llu\tCluster_%lld_%s_[mature]\t%d\t%c\t%llu\t%llu\t%"
+              "d\t%d\t%d\n",
+          cand->chrom, cand->start, cand->end, cand->id,
+          (mature_mirna->arm == 5) ? "5p" : "3p", 0, cand->strand,
+          cand->start + mature_mirna->start, cand->start + mature_mirna->end, 0,
+          mature_read_count, 0);
+  fprintf(fp, "%s\t%llu\t%llu\tCluster_%lld_%s_[star]\t%d\t%c\t%llu\t%llu\t%"
+              "d\t%d\t%d\n",
+          cand->chrom, cand->start, cand->end, cand->id,
+          (mature_mirna->arm == 5) ? "3p" : "5p", 0, cand->strand,
+          cand->start + star_mirna->start, cand->start + star_mirna->end, 0,
+          star_read_count, 0);
   return E_SUCCESS;
 }
-const char *path_to_filename(const char *path) {
-  const char *tmp = path;
-  while (*path != 0) {
-    if (*path == '/') {
-      tmp = path + 1;
-    }
-    path++;
+
+int write_json_entry(FILE *fp, struct extended_candidate *ecand) {
+  struct micro_rna_candidate *cand = ecand->cand;
+  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
+  struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
+
+  fprintf(fp, "\"Cluster_%lld_%s\":{\n", cand->id,
+          (cand->strand == '-') ? "minus" : "plus");
+  fprintf(fp, "\t\"chromosome\":\"%s\",\n", cand->chrom);
+  fprintf(fp, "\t\"candidate_start\":%lld,\n", cand->start);
+  fprintf(fp, "\t\"candidate_end\":%lld,\n", cand->end);
+  fprintf(fp, "\t\"candidate_length\":%lld,\n", cand->end - cand->start);
+  fprintf(fp, "\t\"strand\":\"%c\",\n", cand->strand);
+  fprintf(fp, "\t\"mature_sequence\":\"");
+  for (u32 i = mature_mirna->start; i < mature_mirna->end; i++) {
+    fprintf(fp, "%c", cand->sequence[i]);
   }
-  return tmp;
+  fprintf(fp, "\",\n");
+  fprintf(fp, "\t\"mature_start\":%lld,\n", cand->start + mature_mirna->start);
+  fprintf(fp, "\t\"mature_end\":%lld,\n", cand->start + mature_mirna->end);
+  fprintf(fp, "\t\"arm\":%d,\n", mature_mirna->arm);
+
+  fprintf(fp, "\t\"star_sequence\":\"");
+  for (u32 i = star_mirna->start; i < star_mirna->end; i++) {
+    fprintf(fp, "%c", cand->sequence[i]);
+  }
+  fprintf(fp, "\",\n");
+  fprintf(fp, "\t\"star_start\":%lld,\n", cand->start + star_mirna->start);
+  fprintf(fp, "\t\"star_end\":%lld,\n", cand->start + star_mirna->end);
+  fprintf(fp, "\t\"mfe\":\"%7.5lf kcal/mol/bp\",\n", cand->mfe);
+  fprintf(fp, "\t\"paired_fraction\":%7.5lf,\n", cand->paired_fraction);
+  fprintf(fp, "\t\"mfe_mean\":%7.5lf,\n", cand->mean);
+  fprintf(fp, "\t\"mfe_sd\":%7.5lf,\n", cand->sd);
+  fprintf(fp, "\t\"mfe_precise\":%8lf,\n", cand->mfe);
+  fprintf(fp, "\t\"z_value\":%7.5lf,\n", (cand->mfe - cand->mean) / cand->sd);
+  fprintf(fp, "\t\"p_value\":%7.5le,\n", cand->pvalue);
+  fprintf(fp, "}");
+  return E_SUCCESS;
+}
+
+int cleanup_auxiliary_files(char *cov_plot_file, char *structure_file,
+                            char *coverage_file, char *tex_file,
+                            struct configuration_params *config) {
+  if (config->cleanup_auxiliary_files != 0) {
+    if (cov_plot_file != NULL) {
+      remove(cov_plot_file);
+    }
+    if (structure_file != NULL) {
+      remove(structure_file);
+    }
+    if (coverage_file != NULL) {
+      remove(coverage_file);
+    }
+    if (tex_file != NULL) {
+      remove(tex_file);
+      char *dot = strchr(tex_file, '.');
+      if (dot != NULL) {
+        *dot = 0;
+        char tmp_file[1024];
+        sprintf(tmp_file, "%s.aux", tex_file);
+        remove(tmp_file);
+        sprintf(tmp_file, "%s.log", tex_file);
+        remove(tmp_file);
+      }
+    }
+  }
+
+  if (cov_plot_file != NULL) {
+    free(cov_plot_file);
+  }
+  if (structure_file != NULL) {
+    free(structure_file);
+  }
+  if (coverage_file != NULL) {
+    free(coverage_file);
+  }
+  if (tex_file != NULL) {
+    free(tex_file);
+  }
+  return E_SUCCESS;
 }

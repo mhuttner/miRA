@@ -36,6 +36,8 @@ struct sequence_list {
 };
 
 int vfold(int argc, char **argv);
+int vfold_main(struct configuration_params *config, char *bed_file,
+               char *fasta_file, char *output_file);
 int map_clusters(struct sequence_list **seq_list, struct cluster_list *c_list,
                  struct genome_sequence *seq_table);
 int fold_sequences(struct sequence_list *seq_list,

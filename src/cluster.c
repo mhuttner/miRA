@@ -8,56 +8,22 @@
 #include "errors.h"
 #include "string.h"
 #include "uthash.h"
+#include "util.h"
 
 static int print_help();
 
 int cluster(int argc, char **argv) {
   int c;
-  int gap_size = 10;
-  int min_reads = 10;
-  int window_size = 200;
-  int max_length = 2000;
+  char *config_file = NULL;
+  int log_level = LOG_LEVEL_BASIC;
   char default_output_file[] = "contigs.bed";
   char *output_file = default_output_file;
-  int tmp;
 
-  while ((c = getopt(argc, argv, "g:w:r:l:o:h")) != -1) {
+  while ((c = getopt(argc, argv, "c:o:h")) != -1) {
     switch (c) {
-    case 'g':
-      tmp = atoi(optarg);
-      if (tmp != 0) {
-        gap_size = tmp;
-      } else {
-        print_error(E_INVALID_ARGUMENT);
-        return E_INVALID_ARGUMENT;
-      }
-      break;
-    case 'w':
-      tmp = atoi(optarg);
-      if (tmp != 0) {
-        window_size = tmp;
-      } else {
-        print_error(E_INVALID_ARGUMENT);
-        return E_INVALID_ARGUMENT;
-      }
-      break;
-    case 'r':
-      tmp = atoi(optarg);
-      if (tmp != 0) {
-        min_reads = tmp;
-      } else {
-        print_error(E_INVALID_ARGUMENT);
-        return E_INVALID_ARGUMENT;
-      }
-      break;
-    case 'l':
-      tmp = atoi(optarg);
-      if (tmp != 0) {
-        max_length = tmp;
-      } else {
-        print_error(E_INVALID_ARGUMENT);
-        return E_INVALID_ARGUMENT;
-      }
+
+    case 'c':
+      config_file = optarg;
       break;
     case 'o':
       output_file = optarg;
@@ -65,6 +31,10 @@ int cluster(int argc, char **argv) {
     case 'h':
       print_help();
       return E_SUCCESS;
+    case 'v':
+      log_level = LOG_LEVEL_VERBOSE;
+    case 'q':
+      log_level = LOG_LEVEL_QUIET;
     default:
       break;
     }
@@ -74,27 +44,31 @@ int cluster(int argc, char **argv) {
     print_help();
     return E_NO_FILE_SPECIFIED;
   }
-  // struct sam_file *sam = NULL;
-  // int err = parse_sam(&sam, argv[optind]);
-  // if (err != E_SUCCESS) {
-  //   print_error(err);
-  //   return E_UNKNOWN;
-  // }
+  struct configuration_params *config = NULL;
+  initialize_configuration(&config, config_file);
+  log_configuration(config);
+  int err;
+  err = cluster_main(config, argv[optind], output_file);
+  free(config);
+  return err;
+}
 
+static int print_help() {
+  printf("Description:\n"
+         "    cluster generates a list of main expression contigs based on\n"
+         "    alignment data.\n"
+         "Usage: miRA cluster [-c config file] [-o output file] [-q] [-v] [-h] "
+         "<input SAM file> \n");
+  return E_SUCCESS;
+}
+
+int cluster_main(struct configuration_params *config, char *sam_file,
+                 char *output_file) {
   struct cluster_list *list = NULL;
   struct chrom_info *chromosome_table = NULL;
 
-  parse_clusters(&chromosome_table, &list, argv[optind]);
+  parse_clusters(&chromosome_table, &list, sam_file);
 
-  // create_chromosome_table(&chromosome_table, sam);
-
-  // err = create_clusters(&list, sam);
-  // if (err != E_SUCCESS) {
-  //   print_error(err);
-  //   free_sam(sam);
-  //   return err;
-  // }
-  // free_sam(sam);
   int err;
 
   sort_clusters(list, compare_strand_chrom_start);
@@ -102,23 +76,23 @@ int cluster(int argc, char **argv) {
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
-  err = filter_clusters(list, min_reads);
+  err = filter_clusters(list, config->cluster_min_reads);
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
-  err = merge_clusters(list, gap_size);
+  err = merge_clusters(list, config->cluster_gap_size);
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
-  err = extend_clusters(list, &chromosome_table, window_size);
+  err = extend_clusters(list, &chromosome_table, config->cluster_window_size);
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
-  err = merge_extended_clusters(list, max_length);
+  err = merge_extended_clusters(list, config->cluster_max_length);
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
-  err = filter_extended_clusters(list, max_length);
+  err = filter_extended_clusters(list, config->cluster_max_length);
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
@@ -139,16 +113,6 @@ error_clusters:
   free_clusters(list);
   free_chromosome_table(&chromosome_table);
   return err;
-}
-
-static int print_help() {
-  printf("Description:\n"
-         "    cluster generates a list of main expression contigs based on\n"
-         "    alignment data.\n"
-         "Usage: miRA cluster [-g gapsize] [-w windowsize] [-f minreadnumber]\n"
-         "                    [-l maxlength] [-o outputfile] [-h] "
-         "<input SAM file> \n");
-  return E_SUCCESS;
 }
 
 int parse_clusters(struct chrom_info **table, struct cluster_list **list,

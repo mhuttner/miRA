@@ -10,6 +10,12 @@
 
 static void set_default_config(struct configuration_params *config) {
   config->log_level = LOG_LEVEL_BASIC;
+
+  config->cluster_gap_size = 10;
+  config->cluster_min_reads = 10;
+  config->cluster_window_size = 200;
+  config->cluster_max_length = 2000;
+
   config->max_precursor_length = 0;
   config->min_precursor_length = 50;
   config->min_mfe_per_nt = -0.4;
@@ -24,19 +30,31 @@ static void set_default_config(struct configuration_params *config) {
   config->max_mature_strand_length = 30;
   config->allow_three_mismatches = 0;
   config->allow_two_terminal_mismatches = 0;
+  config->create_coverage_plots = 1;
+  config->create_structure_images = 1;
+  config->create_coverage_images = 1;
+  config->cleanup_auxiliary_files = 1;
 }
 
 static int parse_config_file(struct configuration_params *config,
                              char *config_file) {
   const int MAXLINELENGTH = 1024;
   const char *integer_tokens[] = {
-      "log_level",                "max_precursor_length",
+      "log_level",                "cluster_gap_size",
+      "cluster_min_reads",        "cluster_window_size",
+      "cluster_max_length",       "max_precursor_length",
       "min_precursor_length",     "max_hairpin_count",
       "min_double_strand_length", "permutation_count",
       "min_mature_strand_length", "max_mature_strand_length",
-      "allow_three_mismatches",   "allow_two_terminal_mismatches"};
+      "allow_three_mismatches",   "allow_two_terminal_mismatches",
+      "create_coverage_plots",    "create_structure_images",
+      "create_coverage_images",   "cleanup_auxiliary_files"};
   int integer_token_offsets[] = {
       (int)offsetof(struct configuration_params, log_level),
+      (int)offsetof(struct configuration_params, cluster_gap_size),
+      (int)offsetof(struct configuration_params, cluster_min_reads),
+      (int)offsetof(struct configuration_params, cluster_window_size),
+      (int)offsetof(struct configuration_params, cluster_max_length),
       (int)offsetof(struct configuration_params, max_precursor_length),
       (int)offsetof(struct configuration_params, min_precursor_length),
       (int)offsetof(struct configuration_params, max_hairpin_count),
@@ -45,9 +63,12 @@ static int parse_config_file(struct configuration_params *config,
       (int)offsetof(struct configuration_params, min_mature_strand_length),
       (int)offsetof(struct configuration_params, max_mature_strand_length),
       (int)offsetof(struct configuration_params, allow_three_mismatches),
-      (int)offsetof(struct configuration_params,
-                    allow_two_terminal_mismatches)};
-  const int integer_token_count = 10;
+      (int)offsetof(struct configuration_params, allow_two_terminal_mismatches),
+      (int)offsetof(struct configuration_params, create_coverage_plots),
+      (int)offsetof(struct configuration_params, create_structure_images),
+      (int)offsetof(struct configuration_params, create_coverage_images),
+      (int)offsetof(struct configuration_params, cleanup_auxiliary_files)};
+  const int integer_token_count = 18;
   const char *double_tokens[] = {"min_mfe_per_nt", "max_pvalue", "min_coverage",
                                  "min_paired_fraction"};
   int double_token_offsets[] = {
@@ -160,9 +181,36 @@ int reverse_complement_sequence_string(char **result, char *seq, size_t n) {
   return E_SUCCESS;
 };
 
+int create_file_path(char **file_path, const char *path, const char *filename) {
+  size_t path_n = strnlen(path, 1024);
+  size_t file_n = strnlen(filename, 1024);
+  if (path_n >= 1024 || file_n >= 1024) {
+    return E_FILE_DESCRIPTOR_TOO_LONG;
+  }
+  char *file_path_tmp = (char *)malloc((path_n + file_n + 2) * sizeof(char));
+  if (file_path_tmp == NULL) {
+    return E_MALLOC_FAIL;
+  }
+  if (path[path_n - 1] == '/') {
+    sprintf(file_path_tmp, "%s%s", path, filename);
+  } else {
+    sprintf(file_path_tmp, "%s/%s", path, filename);
+  }
+  *file_path = file_path_tmp;
+  return E_SUCCESS;
+}
+
 void log_configuration(struct configuration_params *config) {
   log_basic(config->log_level, "Configuartion Parameters:\n");
   log_basic(config->log_level, "    log_level %d\n", config->log_level);
+  log_basic(config->log_level, "    cluster_gap_size %d\n",
+            config->cluster_gap_size);
+  log_basic(config->log_level, "    cluster_min_reads %d\n",
+            config->cluster_min_reads);
+  log_basic(config->log_level, "    cluster_window_size %d\n",
+            config->cluster_window_size);
+  log_basic(config->log_level, "    cluster_max_length %d\n",
+            config->cluster_max_length);
   log_basic(config->log_level, "    max_precursor_length %d\n",
             config->max_precursor_length);
   log_basic(config->log_level, "    min_precursor_length %d\n",
@@ -187,6 +235,14 @@ void log_configuration(struct configuration_params *config) {
             config->allow_three_mismatches);
   log_basic(config->log_level, "    allow_two_terminal_mismatches %d\n",
             config->allow_two_terminal_mismatches);
+  log_basic(config->log_level, "    create_coverage_plots %d\n",
+            config->create_coverage_plots);
+  log_basic(config->log_level, "    create_structure_images %d\n",
+            config->create_structure_images);
+  log_basic(config->log_level, "    create_coverage_images %d\n",
+            config->create_coverage_images);
+  log_basic(config->log_level, "    cleanup_auxiliary_files %d\n",
+            config->cleanup_auxiliary_files);
   log_basic(config->log_level, "\n\n");
 }
 
@@ -198,6 +254,7 @@ void log_basic(int loglevel, const char *msg, ...) {
   va_start(fmtargs, msg);
   vprintf(msg, fmtargs);
   va_end(fmtargs);
+  fflush(stdout);
 }
 
 void log_verbose(int loglevel, const char *msg, ...) {
@@ -208,6 +265,7 @@ void log_verbose(int loglevel, const char *msg, ...) {
   va_start(fmtargs, msg);
   vprintf(msg, fmtargs);
   va_end(fmtargs);
+  fflush(stdout);
 }
 
 double mean(double *list, int n) {

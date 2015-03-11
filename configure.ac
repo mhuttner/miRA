@@ -1,4 +1,4 @@
-AC_INIT([miRA], [0.1], [michael@mhuttner.com],
+AC_INIT([miRA], [1.0.0], [michael@mhuttner.com],
         [miRA], [http://mhuttner.com/])
 AC_PREREQ([2.68])
 
@@ -8,7 +8,7 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 
-AM_INIT_AUTOMAKE([1.11 subdir-objects -Wall -Werror])
+AM_INIT_AUTOMAKE([1.11 foreign subdir-objects -Wall -Werror])
 AC_CONFIG_FILES([Makefile])
 
 AM_WITH_DMALLOC
@@ -39,6 +39,15 @@ if test x$ac_cv_prog_java_works = xyes; then
 	AC_DEFINE([HAVE_JAVA],[1],[Does Java work])
 fi
 AC_DEFINE_UNQUOTED([JAVA_VM_COMMAND],"$ac_cv_prog_JAVA",[Command to call java])
+
+AC_CHECK_PROG(PDFLATEX, pdflatex, pdflatex)
+if ! test -z "$PDFLATEX"; then
+  AC_DEFINE([HAVE_LATEX],[1],[Is a version of latex available])
+fi
+AC_CHECK_PROG(GNUPLOT, gnuplot, gnuplot)
+if ! test -z "$GNUPLOT"; then
+  AC_DEFINE([HAVE_GNUPLOT],[1],[Is a version of gnuplot available])
+fi
 
 
 

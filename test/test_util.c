@@ -50,6 +50,13 @@ void test_config_parsing(struct test *t) {
         config->allow_two_terminal_mismatches);
 
   t_assert_msg(t, config->log_level == 1, "log_level wrong");
+  t_assert_msg(t, config->cluster_gap_size == -37, "cluster_gap_size wrong");
+  t_assert_msg(t, config->cluster_min_reads == -38, "cluster_min_reads wrong");
+  t_assert_msg(t, config->cluster_window_size == -39,
+               "cluster_window_size wrong");
+  t_assert_msg(t, config->cluster_max_length == -40,
+               "cluster_max_length wrong");
+
   t_assert_msg(t, config->max_precursor_length == -41,
                "max_precursor_length wrong");
   t_assert_msg(t, config->min_precursor_length == 50,

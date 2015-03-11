@@ -52,6 +52,8 @@ struct unique_read_list {
 };
 
 int coverage(int argc, char **argv);
+int coverage_main(struct configuration_params *config, char *mira_file,
+                  char *sam_file, char *output_path);
 int create_coverage_table(struct chrom_coverage **table, struct sam_file *sam);
 int coverage_test_candidates(struct extended_candidate_list *ecand_list,
                              struct chrom_coverage **coverage_table,

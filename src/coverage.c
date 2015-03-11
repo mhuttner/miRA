@@ -17,16 +17,11 @@ int coverage(int argc, char **argv) {
   char *config_file = NULL;
   int c;
   int log_level = LOG_LEVEL_BASIC;
-  char default_output_file[] = "output.tmp";
-  char *output_file = default_output_file;
 
   while ((c = getopt(argc, argv, "c:o:hvq")) != -1) {
     switch (c) {
     case 'c':
       config_file = optarg;
-      break;
-    case 'o':
-      output_file = optarg;
       break;
     case 'h':
       print_help();
@@ -39,7 +34,7 @@ int coverage(int argc, char **argv) {
       break;
     }
   }
-  if (optind + 2 > argc) { /* missing input file */
+  if (optind + 3 > argc) { /* missing input file */
     printf("No Input Files specified\n\n");
     print_help();
     return E_NO_FILE_SPECIFIED;
@@ -47,17 +42,33 @@ int coverage(int argc, char **argv) {
   struct configuration_params *config = NULL;
   initialize_configuration(&config, config_file);
   log_configuration(config);
+  int err =
+      coverage_main(config, argv[optind], argv[optind + 1], argv[optind + 2]);
+  free(config);
+  return err;
+}
+
+static int print_help() {
+  printf("Description:\n"
+         "    Coverage based verification on micro RNA candidates \n"
+         "Usage: miRA coverage <input miRA file> <input SAM file> <output "
+         "directory>\n");
+  return E_SUCCESS;
+}
+
+int coverage_main(struct configuration_params *config, char *mira_file,
+                  char *sam_file, char *output_path) {
   int err;
   struct sam_file *sam = NULL;
   struct candidate_list *c_list = NULL;
   struct extended_candidate_list *ec_list = NULL;
   struct chrom_coverage *cov_table = NULL;
 
-  err = read_candidate_file(&c_list, argv[optind]);
+  err = read_candidate_file(&c_list, mira_file);
   if (err) {
     goto error;
   }
-  err = parse_sam(&sam, argv[optind + 1]);
+  err = parse_sam(&sam, sam_file);
   if (err) {
     goto error;
   }
@@ -75,7 +86,7 @@ int coverage(int argc, char **argv) {
     goto error;
   }
   free_sam(sam);
-  err = report_valid_candiates(ec_list, &cov_table);
+  err = report_valid_candiates(ec_list, &cov_table, output_path, config);
   if (err) {
     goto error;
   }
@@ -98,13 +109,6 @@ error:
   }
   print_error(err);
   return err;
-}
-
-static int print_help() {
-  printf("Description:\n"
-         "    Coverage based verification on micro RNA candidates \n"
-         "Usage: miRA coverage <input miRA file> <input SAM file>\n");
-  return E_SUCCESS;
 }
 
 int create_coverage_table(struct chrom_coverage **table, struct sam_file *sam) {
@@ -540,6 +544,7 @@ int count_unique_reads(struct extended_candidate *ecand, struct sam_file *sam) {
 
   for (size_t i = 0; i < sam->n; i++) {
     entry = sam->entries[i];
+    long entry_start = entry->pos - 1;
     strand = (entry->flag & REV_COMPLM) ? '-' : '+';
     if (strand != cand->strand) {
       continue;
@@ -547,8 +552,8 @@ int count_unique_reads(struct extended_candidate *ecand, struct sam_file *sam) {
     if (strcmp(entry->rname, cand->chrom) != 0) {
       continue;
     }
-    if (entry->pos >= global_mature_start) {
-      u64 end = entry->pos + strlen(entry->seq);
+    if (entry_start >= global_mature_start) {
+      u64 end = entry_start + strlen(entry->seq);
       if (end <= global_mature_end) {
         if (strand == '-') {
           char *reversed = NULL;
@@ -557,11 +562,11 @@ int count_unique_reads(struct extended_candidate *ecand, struct sam_file *sam) {
           free(entry->seq);
           entry->seq = reversed;
         }
-        add_read_to_unique_read_list(mature_reads, entry->pos, entry->seq);
+        add_read_to_unique_read_list(mature_reads, entry_start, entry->seq);
       }
     }
-    if (entry->pos >= global_star_start) {
-      u64 end = entry->pos + strlen(entry->seq);
+    if (entry_start >= global_star_start) {
+      u64 end = entry_start + strlen(entry->seq);
       if (end <= global_star_end) {
         if (strand == '-') {
           char *reversed = NULL;
@@ -570,7 +575,7 @@ int count_unique_reads(struct extended_candidate *ecand, struct sam_file *sam) {
           free(entry->seq);
           entry->seq = reversed;
         }
-        add_read_to_unique_read_list(star_reads, entry->pos, entry->seq);
+        add_read_to_unique_read_list(star_reads, entry_start, entry->seq);
       }
     }
   }

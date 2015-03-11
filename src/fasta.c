@@ -50,6 +50,10 @@ int read_fasta_file(struct genome_sequence **sequence_table, char *filename) {
       goto parse_error;
     }
   }
+  if (*sequence_table == NULL) {
+    fclose(fp);
+    return E_UNKNOWN_FILE_IO_ERROR;
+  }
   HASH_ADD_STR(*sequence_table, chrom, current_seq);
   fclose(fp);
   return E_SUCCESS;
