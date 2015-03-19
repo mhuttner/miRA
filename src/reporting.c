@@ -7,22 +7,36 @@
 #include "../config.h"
 #include "math.h"
 #include "util.h"
+#include <sys/stat.h>
+#include <errno.h>
 
 int report_valid_candiates(struct extended_candidate_list *ec_list,
                            struct chrom_coverage **coverage_table,
                            char *output_path,
                            struct configuration_params *config) {
+
+  char *cov_plot_path = NULL;
+  char *structure_path = NULL;
+  char *coverage_path = NULL;
+  char *report_path = NULL;
+
+  int err = create_output_directory_structure(&cov_plot_path, &structure_path,
+                                              &coverage_path, &report_path,
+                                              output_path);
+  if (err) {
+    return err;
+  }
   char bed_result_filename[] = "final_candidates.bed";
   char *bed_file = NULL;
   create_file_path(&bed_file, output_path, bed_result_filename);
   FILE *bed_fp = fopen(bed_file, "w");
   free(bed_file);
-  char json_result_filename[] = "final_candidates.json";
-  char *json_file = NULL;
-  create_file_path(&json_file, output_path, json_result_filename);
-  FILE *json_fp = fopen(json_file, "w");
-  free(json_file);
-  fprintf(json_fp, "{\n");
+  char html_result_filename[] = "final_candidates.html";
+  char *html_file = NULL;
+  create_file_path(&html_file, output_path, html_result_filename);
+  FILE *html_fp = fopen(html_file, "w");
+  free(html_file);
+  inititalize_html_report(html_fp);
 
   struct extended_candidate *ecand = NULL;
   struct chrom_coverage *chrom_cov = NULL;
@@ -33,33 +47,91 @@ int report_valid_candiates(struct extended_candidate_list *ec_list,
     }
     HASH_FIND_STR(*coverage_table, ecand->cand->chrom, chrom_cov);
     if (chrom_cov == NULL) {
+      free(cov_plot_path);
+      free(structure_path);
+      free(coverage_path);
+      free(report_path);
       return E_CHROMOSOME_NOT_FOUND;
     }
-    create_candidate_report(ecand, chrom_cov, output_path, config);
+    create_candidate_report(ecand, chrom_cov, cov_plot_path, structure_path,
+                            coverage_path, report_path, config);
     if (bed_fp != NULL) {
       write_bed_lines(bed_fp, ecand);
     }
-    if (json_fp != NULL) {
-      write_json_entry(json_fp, ecand);
-      if (i < ec_list->n - 1) {
-        fprintf(json_fp, ",\n");
-      }
-    }
+    write_html_table_row(html_fp, ecand);
   }
   if (bed_fp != NULL) {
     fclose(bed_fp);
   }
-  if (json_fp != NULL) {
-    fprintf(json_fp, "}");
-    fclose(json_fp);
+  finalize_html_report(html_fp);
+  if (html_fp != NULL) {
+    fclose(html_fp);
+  }
+  free(cov_plot_path);
+  free(structure_path);
+  free(coverage_path);
+  free(report_path);
+
+  return E_SUCCESS;
+}
+
+int create_output_directory_structure(char **cov_plot_ouput_path,
+                                      char **structure_output_path,
+                                      char **coverage_output_path,
+                                      char **report_output_path,
+                                      const char *output_path) {
+  int err = 0;
+  err = create_directory_if_ne(output_path);
+  if (err) {
+    return err;
+  }
+  const char COV_PLOT_SUBDIR[] = "coverage_plots/";
+  create_file_path(cov_plot_ouput_path, output_path, COV_PLOT_SUBDIR);
+  err = create_directory_if_ne(*cov_plot_ouput_path);
+  if (err) {
+    return err;
+  }
+  const char STRUCTURE_SUBDIR[] = "structure_plots/";
+  create_file_path(structure_output_path, output_path, STRUCTURE_SUBDIR);
+  err = create_directory_if_ne(*structure_output_path);
+  if (err) {
+    return err;
+  }
+  const char COVERAGE_SUBDIR[] = "coverage_structures/";
+  create_file_path(coverage_output_path, output_path, COVERAGE_SUBDIR);
+  err = create_directory_if_ne(*coverage_output_path);
+  if (err) {
+    return err;
+  }
+  const char REPORT_SUBDIR[] = "reports/";
+  create_file_path(report_output_path, output_path, REPORT_SUBDIR);
+  err = create_directory_if_ne(*report_output_path);
+  if (err) {
+    return err;
   }
 
   return E_SUCCESS;
 }
 
+int create_directory_if_ne(const char *path) {
+  int err = 0;
+
+  err = mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+  /**
+   * if mkdir failed and if the directory does not already exist, something went
+   * wrong */
+  if (err == -1 && errno != EEXIST) {
+    return E_CREATING_DIRECTORY_FAILED;
+  }
+  return E_SUCCESS;
+}
+
 int create_candidate_report(struct extended_candidate *ecand,
                             struct chrom_coverage *chrom_cov,
-                            const char *output_path,
+                            const char *cov_plot_ouput_path,
+                            const char *structure_output_path,
+                            const char *coverage_output_path,
+                            const char *report_output_path,
                             struct configuration_params *config) {
   char *cov_plot_file = NULL;
   char *structure_file = NULL;
@@ -69,7 +141,8 @@ int create_candidate_report(struct extended_candidate *ecand,
 
 #ifdef HAVE_GNUPLOT
   if (config->create_coverage_plots) {
-    err = create_coverage_plot(&cov_plot_file, ecand, chrom_cov, output_path);
+    err = create_coverage_plot(&cov_plot_file, ecand, chrom_cov,
+                               cov_plot_ouput_path);
     if (err != E_SUCCESS) {
       cov_plot_file = NULL;
     }
@@ -77,7 +150,7 @@ int create_candidate_report(struct extended_candidate *ecand,
 #endif /* HAVE_GNUPLOT */
 #ifdef HAVE_JAVA
   if (config->create_structure_images) {
-    err = create_structure_image(&structure_file, ecand, output_path);
+    err = create_structure_image(&structure_file, ecand, structure_output_path);
     if (err != E_SUCCESS) {
       structure_file = NULL;
     }
@@ -86,14 +159,16 @@ int create_candidate_report(struct extended_candidate *ecand,
 
 #ifdef HAVE_JAVA
   if (config->create_coverage_images) {
-    err = create_coverage_image(&coverage_file, ecand, chrom_cov, output_path);
+    err = create_coverage_image(&coverage_file, ecand, chrom_cov,
+                                coverage_output_path);
     if (err != E_SUCCESS) {
       coverage_file = NULL;
     }
   }
 #endif /* HAVE_JAVA */
-  err = create_latex_template(&tex_file, ecand, chrom_cov, cov_plot_file,
-                              structure_file, coverage_file, output_path);
+  err =
+      create_latex_template(&tex_file, ecand, chrom_cov, cov_plot_file,
+                            structure_file, coverage_file, report_output_path);
   if (err != E_SUCCESS) {
     cleanup_auxiliary_files(cov_plot_file, structure_file, coverage_file,
                             tex_file, config);
@@ -101,7 +176,7 @@ int create_candidate_report(struct extended_candidate *ecand,
   }
 
 #ifdef HAVE_LATEX
-  err = compile_tex_file(tex_file, output_path);
+  err = compile_tex_file(tex_file, report_output_path);
   if (err != E_SUCCESS) {
     cleanup_auxiliary_files(cov_plot_file, structure_file, coverage_file,
                             tex_file, config);
@@ -241,7 +316,8 @@ int create_structure_image(char **result_file, struct extended_candidate *ecand,
 
   char java_system_call[4096];
   snprintf(java_system_call, SYS_CALL_MAX_LENGHT,
-           "java -cp %s %s -algorithm %s -autoInteriorLoops %s "
+           "java -Dapple.awt.UIElement=\"true\" -cp %s %s -algorithm %s "
+           "-autoInteriorLoops %s "
            "-autoTerminalLoops %s -resolution %d -highlightRegion "
            "\"%d-%d:fill=%s;%d-%d:fill=%s\" -title \"Cluster %lld\" "
            "-sequenceDBN \"%s\" "
@@ -308,7 +384,8 @@ int create_coverage_image(char **result_file, struct extended_candidate *ecand,
   size_t sys_call_n = 4096 + segment_n * cand_n;
   char *java_system_call = (char *)malloc(sys_call_n * sizeof(char));
   snprintf(java_system_call, sys_call_n,
-           "java -cp %s %s -algorithm %s -autoInteriorLoops %s "
+           "java -Dapple.awt.UIElement=\"true\" -cp %s %s -algorithm %s "
+           "-autoInteriorLoops %s "
            "-autoTerminalLoops %s -resolution %d -highlightRegion "
            "\"%s\" -title \"Cluster %lld\" "
            "-sequenceDBN \"%s\" "
@@ -610,6 +687,71 @@ int write_json_entry(FILE *fp, struct extended_candidate *ecand) {
   fprintf(fp, "\t\"z_value\":%7.5lf,\n", (cand->mfe - cand->mean) / cand->sd);
   fprintf(fp, "\t\"p_value\":%7.5le,\n", cand->pvalue);
   fprintf(fp, "}");
+  return E_SUCCESS;
+}
+
+int inititalize_html_report(FILE *fp) {
+  if (fp == NULL) {
+    return E_FILE_WRITING_FAILED;
+  }
+  fprintf(fp, "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'><"
+              "meta http-equiv='X-UA-Compatible' content='IE=edge'><meta name='"
+              "viewport' content='width=device-width,initial-scale=1'><title>"
+              "miRA candidate summary</"
+              "title><!--Bootstrap--><link rel='stylesheet' href='https://"
+              "maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/"
+              "bootstrap.min.css'></head><body><h1>miRA candidate summary</"
+              "h1><table class='table table-bordered'><thead><tr><th><span>"
+              "CandidateID</span></th><th><span>Chromosome</span></"
+              "th><th><span>Strand</span></th><th><span>Start(pre)</span></"
+              "th><th><span>Stop(pre)</span></th><th><span>MFE/nt</span></"
+              "th><th><span>p-value</span></th><th><span>pairedfraction</"
+              "span></th><th><span>Maturesequence</span></"
+              "th><th><span>Start(mature)</span></th><th><span>Stop(mature)</"
+              "span></th><th><span>Arm</span></th><th><span>Starsequence</"
+              "span></th><th><span>Start(star)</span></"
+              "th><th><span>Stop(star)</span></th></tr></thead><tbody>");
+  return E_SUCCESS;
+}
+int write_html_table_row(FILE *fp, struct extended_candidate *ecand) {
+  if (fp == NULL) {
+    return E_FILE_WRITING_FAILED;
+  }
+  struct micro_rna_candidate *cand = ecand->cand;
+  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
+  struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
+  fprintf(fp, "<tr><td ><a "
+              "href=''>Cluster_%lld_%s</a></td><td>%s</td><td>%s</td><td>%lld</"
+              "td><td>%lld</td><td>%7.5lf "
+              "</td><td>%7.5le</td><td>%7.5lf</td><td>",
+          cand->id, (cand->strand == '-') ? "minus" : "plus", cand->chrom,
+          (cand->strand == '-') ? "minus" : "plus", cand->start, cand->end,
+          cand->mfe, cand->pvalue, cand->paired_fraction);
+  for (u32 i = mature_mirna->start; i < mature_mirna->end; i++) {
+    fprintf(fp, "%c", cand->sequence[i]);
+  }
+  fprintf(fp, "</td><td>%lld</td><td>%lld</td><td>%dp</td><td>",
+          cand->start + mature_mirna->start, cand->start + mature_mirna->end,
+          mature_mirna->arm);
+  for (u32 i = star_mirna->start; i < star_mirna->end; i++) {
+    fprintf(fp, "%c", cand->sequence[i]);
+  }
+  fprintf(fp, "</td><td>%lld</td><td>%lld</td></tr>",
+          cand->start + star_mirna->start, cand->start + star_mirna->end);
+  return E_SUCCESS;
+}
+
+int finalize_html_report(FILE *fp) {
+  if (fp == NULL) {
+    return E_FILE_WRITING_FAILED;
+  }
+  fprintf(fp, "</tbody></"
+              "table><!--jQuery(necessaryforBootstrap'sJavaScriptplugins)--><"
+              "script src='https://code.jquery.com/jquery-1.11.2.min.js'></"
+              "script><!--Includeallcompiledplugins(below),"
+              "orincludeindividualfilesasneeded--><script src='https://"
+              "maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js'></"
+              "script></body></html>");
   return E_SUCCESS;
 }
 

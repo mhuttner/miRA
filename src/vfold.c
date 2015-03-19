@@ -17,6 +17,10 @@
 #include "structure_evaluation.h"
 #include "candidates.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 static int print_help();
 
 int vfold(int argc, char *argv[]) {
@@ -208,6 +212,9 @@ int fold_sequences(struct sequence_list *seq_list,
   struct structure_list *s_list = NULL;
 
   log_basic(config->log_level, "Initializing folding...\n");
+#ifdef _OPENMP
+#pragma omp parallel for private(fs, s_list)
+#endif
   for (size_t i = 0; i < seq_list->n; i++) {
     log_basic(config->log_level, "\rFolding sequence %5ld \\%5ld", i + 1,
               seq_list->n);

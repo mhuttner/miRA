@@ -3,7 +3,7 @@ bin_PROGRAMS = miRA
 miRAdir = src
 miRA_SOURCES = src/main.c src/help.c src/cluster.c src/parse_sam.c src/errors.c src/vfold.c src/bed.c src/fasta.c src/util.c src/structure_evaluation.c src/candidates.c src/coverage.c src/reporting.c src/full.c
 miRA_HEADERS = src/help.h src/cluster.h src/parse_sam.h src/errors.h src/vfold.h src/bed.h src/fasta.h src/util.h src/structure_evaluation.h src/candidates.h src/coverage.h src/reporting.h src/full.h src/defs.h src/uthash.h
-miRA_CFLAGS = -std=c99 
+miRA_CFLAGS = -std=c99 $(OPENMP_CFLAGS)
 miRA_CPPFLAGS = -DDEBUG
 miRA_LDADD = libLfold.a
 
@@ -36,7 +36,7 @@ src/Lfold/utils.h \
 src/Lfold/energy_const.h
 
 
-libLfold_a_CFLAGS = -std=c99 
+libLfold_a_CFLAGS = -std=c99 $(OPENMP_CFLAGS)
 
 
 noinst_HEADERS  = src/Lfold/intl11.h src/Lfold/intl11dH.h\
