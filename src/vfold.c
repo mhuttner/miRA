@@ -216,7 +216,7 @@ int fold_sequences(struct sequence_list *seq_list,
 #pragma omp parallel for private(fs, s_list)
 #endif
   for (size_t i = 0; i < seq_list->n; i++) {
-    log_basic(config->log_level, "\rFolding sequence %5ld \\%5ld", i + 1,
+    log_basic(config->log_level, "Folding sequence %5ld \\%5ld \n", i + 1,
               seq_list->n);
     fs = seq_list->sequences[i];
     int max_length = fs->n;
@@ -275,7 +275,7 @@ int calculate_mfe_distribution(struct foldable_sequence *fs,
   if (fs->structure == NULL) {
     return E_NO_STRUCTURE;
   }
-  char *seq_copy = (char *)malloc((fs->n + 1) * sizeof(char));
+  char *seq_copy = (char *)malloc((fs->n) * sizeof(char));
   if (seq_copy == NULL) {
     return E_MALLOC_FAIL;
   }
@@ -284,7 +284,7 @@ int calculate_mfe_distribution(struct foldable_sequence *fs,
     free(seq_copy);
     return E_MALLOC_FAIL;
   }
-  char *tmp = (char *)malloc((fs->n + 1) * sizeof(char));
+  char *tmp = (char *)malloc((fs->n) * sizeof(char));
   if (tmp == NULL) {
     free(seq_copy);
     free(mfe_list);
@@ -292,10 +292,10 @@ int calculate_mfe_distribution(struct foldable_sequence *fs,
   }
 
   memcpy(seq_copy, fs->seq, fs->n);
-  seq_copy[fs->n] = 0;
+  seq_copy[fs->n - 1] = 0;
 
   for (int i = 0; i < permutation_count; i++) {
-    fisher_yates_shuffle(seq_copy, fs->n);
+    fisher_yates_shuffle(seq_copy, fs->n - 1);
     mfe_list[i] = fold(seq_copy, tmp) / fs->n;
   }
 
