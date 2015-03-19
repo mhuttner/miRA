@@ -36,11 +36,18 @@ int report_valid_candiates(struct extended_candidate_list *ec_list,
   create_file_path(&html_file, output_path, html_result_filename);
   FILE *html_fp = fopen(html_file, "w");
   free(html_file);
+  char gtf_result_filename[] = "final_candidates.gtf";
+  char *gtf_file = NULL;
+  create_file_path(&gtf_file, output_path, gtf_result_filename);
+  FILE *gtf_fp = fopen(gtf_file, "w");
+  free(gtf_file);
+
   inititalize_html_report(html_fp);
 
   struct extended_candidate *ecand = NULL;
   struct chrom_coverage *chrom_cov = NULL;
   for (size_t i = 0; i < ec_list->n; i++) {
+
     ecand = ec_list->candidates[i];
     if (ecand->is_valid != 1) {
       continue;
@@ -55,13 +62,15 @@ int report_valid_candiates(struct extended_candidate_list *ec_list,
     }
     create_candidate_report(ecand, chrom_cov, cov_plot_path, structure_path,
                             coverage_path, report_path, config);
-    if (bed_fp != NULL) {
-      write_bed_lines(bed_fp, ecand);
-    }
+    write_bed_lines(bed_fp, ecand);
+    write_gtf_line(gtf_fp, ecand);
     write_html_table_row(html_fp, ecand);
   }
   if (bed_fp != NULL) {
     fclose(bed_fp);
+  }
+  if (gtf_fp != NULL) {
+    fclose(gtf_fp);
   }
   finalize_html_report(html_fp);
   if (html_fp != NULL) {
@@ -139,8 +148,11 @@ int create_candidate_report(struct extended_candidate *ecand,
   char *tex_file = NULL;
   int err;
 
+  log_basic(config->log_level, "\tGenerating report for cluster %lld...\n",
+            ecand->cand->id);
 #ifdef HAVE_GNUPLOT
   if (config->create_coverage_plots) {
+
     err = create_coverage_plot(&cov_plot_file, ecand, chrom_cov,
                                cov_plot_ouput_path);
     if (err != E_SUCCESS) {
@@ -268,7 +280,7 @@ int create_coverage_plot(char **result_file, struct extended_candidate *ecand,
           "'plus','' using 4:2 with histeps lw 2 linecolor rgb 'red' axes x2y1 "
           "notitle, '' using 1:3 with histeps lw 2 linecolor rgb 'blue' title "
           "'minus', '' using 4:3 with histeps lw 2 linecolor rgb 'blue' "
-          "notitle\"",
+          "notitle\" &>/dev/null",
           file_path, box1_start, box1_end, box2_start, box2_end, y_max, x_start,
           x_end, x2_start, x2_end, data_file_path);
   int err = system(gnuplot_system_call);
@@ -317,11 +329,11 @@ int create_structure_image(char **result_file, struct extended_candidate *ecand,
   char java_system_call[4096];
   snprintf(java_system_call, SYS_CALL_MAX_LENGHT,
            "java -Dapple.awt.UIElement=\"true\" -cp %s %s -algorithm %s "
-           "-autoInteriorLoops %s "
+           "-autoInteriorLoops %s -error False -warning False "
            "-autoTerminalLoops %s -resolution %d -highlightRegion "
            "\"%d-%d:fill=%s;%d-%d:fill=%s\" -title \"Cluster %lld\" "
            "-sequenceDBN \"%s\" "
-           "-structureDBN \"%s\" -o %s",
+           "-structureDBN \"%s\" -o %s &>/dev/null",
            varna_path, varna_class_name, varna_algorith,
            varna_auto_interior_loops, varna_auto_terminal_loops,
            varna_resolution, m_start, m_end, hex_color_red, s_start, s_end,
@@ -385,11 +397,11 @@ int create_coverage_image(char **result_file, struct extended_candidate *ecand,
   char *java_system_call = (char *)malloc(sys_call_n * sizeof(char));
   snprintf(java_system_call, sys_call_n,
            "java -Dapple.awt.UIElement=\"true\" -cp %s %s -algorithm %s "
-           "-autoInteriorLoops %s "
+           "-autoInteriorLoops %s -error False -warning False "
            "-autoTerminalLoops %s -resolution %d -highlightRegion "
            "\"%s\" -title \"Cluster %lld\" "
            "-sequenceDBN \"%s\" "
-           "-structureDBN \"%s\" -o %s",
+           "-structureDBN \"%s\" -o %s &>/dev/null",
            varna_path, varna_class_name, varna_algorith,
            varna_auto_interior_loops, varna_auto_terminal_loops,
            varna_resolution, highlight_string, cand->id, seq, structure,
@@ -491,11 +503,13 @@ int create_latex_template(char **tex_file, struct extended_candidate *ecand,
           "Mean coverage precursor miRNA: \\verb$%5.4f$ per nucleotide\\\\\n"
           "Mean coverage mature miRNA: \\verb$%5.4f$ per nucleotide\\\\\n"
           "Mean coverage star miRNA: \\verb$%5.4f$ per nucleotide\\\\\n"
-          "Total number of reads for precursor miRNA:\\\\\\n",
+          "Total number of reads for precursor miRNA:\\verb$ %d (%3.2e%% of "
+          "total reads)$\\\\\\n",
           (double)total_coverage / (cand->end - cand->start),
           (double)mature_mirna->coverage /
               (mature_mirna->end - mature_mirna->start),
-          (double)star_mirna->coverage / (star_mirna->end - star_mirna->start));
+          (double)star_mirna->coverage / (star_mirna->end - star_mirna->start),
+          ecand->total_reads, ecand->total_read_percent);
   if (cov_plot_file != NULL) {
     fprintf(fp, "\\begin{center}\n"
                 "\\includegraphics[width=\\textwidth]{%s}\n"
@@ -589,9 +603,10 @@ int write_unique_reads_to_tex(FILE *fp, struct micro_rna_candidate *cand,
 
 int compile_tex_file(const char *tex_file_path, const char *output_path) {
   char latex_system_call[2048];
-  sprintf(latex_system_call,
-          "pdflatex -interaction=batchmode -output-directory=\"%s\" %s",
-          output_path, tex_file_path);
+  sprintf(
+      latex_system_call,
+      "pdflatex -interaction=batchmode -output-directory=\"%s\" %s >/dev/null",
+      output_path, tex_file_path);
   int err = system(latex_system_call);
   if (err != 0) {
     return E_LATEX_SYSTEM_CALL_FAILED;
@@ -616,6 +631,9 @@ int map_coverage_to_color_index(u32 *result, u32 coverage) {
 }
 
 int write_bed_lines(FILE *fp, struct extended_candidate *ecand) {
+  if (fp == NULL) {
+    return E_FILE_WRITING_FAILED;
+  }
   struct micro_rna_candidate *cand = ecand->cand;
   struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
   struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
@@ -650,8 +668,35 @@ int write_bed_lines(FILE *fp, struct extended_candidate *ecand) {
           star_read_count, 0);
   return E_SUCCESS;
 }
+int write_gtf_line(FILE *fp, struct extended_candidate *ecand) {
+  if (fp == NULL) {
+    return E_FILE_WRITING_FAILED;
+  }
+  struct micro_rna_candidate *cand = ecand->cand;
+  struct unique_read_list *mature_reads = ecand->mature_reads;
+  struct unique_read_list *star_reads = ecand->star_reads;
+
+  u32 mature_read_count = 0;
+  for (size_t i = 0; i < mature_reads->n; i++) {
+    mature_read_count += mature_reads->reads[i]->count;
+  }
+  u32 star_read_count = 0;
+  for (size_t i = 0; i < star_reads->n; i++) {
+    star_read_count += star_reads->reads[i]->count;
+  }
+
+  fprintf(fp,
+          "%s\tmiRA\texon\t%lld\t%lld\t0\t%c\t.\tgene_id \"Cluster_%lld_%s\"\n",
+          cand->chrom, cand->start + 1, cand->end, cand->strand, cand->id,
+          (cand->strand == '+') ? "plus" : "minus");
+
+  return E_SUCCESS;
+}
 
 int write_json_entry(FILE *fp, struct extended_candidate *ecand) {
+  if (fp == NULL) {
+    return E_FILE_WRITING_FAILED;
+  }
   struct micro_rna_candidate *cand = ecand->cand;
   struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
   struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
@@ -694,23 +739,44 @@ int inititalize_html_report(FILE *fp) {
   if (fp == NULL) {
     return E_FILE_WRITING_FAILED;
   }
-  fprintf(fp, "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'><"
-              "meta http-equiv='X-UA-Compatible' content='IE=edge'><meta name='"
-              "viewport' content='width=device-width,initial-scale=1'><title>"
-              "miRA candidate summary</"
-              "title><!--Bootstrap--><link rel='stylesheet' href='https://"
-              "maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/"
-              "bootstrap.min.css'></head><body><h1>miRA candidate summary</"
-              "h1><table class='table table-bordered'><thead><tr><th><span>"
-              "CandidateID</span></th><th><span>Chromosome</span></"
-              "th><th><span>Strand</span></th><th><span>Start(pre)</span></"
-              "th><th><span>Stop(pre)</span></th><th><span>MFE/nt</span></"
-              "th><th><span>p-value</span></th><th><span>pairedfraction</"
-              "span></th><th><span>Maturesequence</span></"
-              "th><th><span>Start(mature)</span></th><th><span>Stop(mature)</"
-              "span></th><th><span>Arm</span></th><th><span>Starsequence</"
-              "span></th><th><span>Start(star)</span></"
-              "th><th><span>Stop(star)</span></th></tr></thead><tbody>");
+  fprintf(
+      fp,
+      "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'><"
+      "meta http-equiv='X-UA-Compatible' content='IE=edge'><meta name='"
+      "viewport' content='width=device-width,initial-scale=1'><title>"
+      "miRA candidate summary</"
+      "title><!--Bootstrap--><link rel='stylesheet' href='https://"
+      "maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/"
+      "bootstrap.min.css'></head><body><h1>miRA candidate summary</"
+      "h1><table class='table table-bordered'><thead><tr><th><span>"
+      "CandidateID<span class='glyphicon glyphicon-chevron-down' "
+      "aria-hidden='true'></span></span></th><th><span>Chromosome<span "
+      "class='glyphicon glyphicon-chevron-down' "
+      "aria-hidden='true'></span></span></"
+      "th><th><span>Strand<span class='glyphicon glyphicon-chevron-down' "
+      "aria-hidden='true'></span></span></th><th><span>Start(pre)<span "
+      "class='glyphicon glyphicon-chevron-down' "
+      "aria-hidden='true'></span></span></"
+      "th><th><span>Stop(pre)<span class='glyphicon glyphicon-chevron-down' "
+      "aria-hidden='true'></span></span></th><th><span>MFE/nt<span "
+      "class='glyphicon glyphicon-chevron-down' "
+      "aria-hidden='true'></span></span></"
+      "th><th><span>p-value<span class='glyphicon glyphicon-chevron-down' "
+      "aria-hidden='true'></span></span></th><th><span>paired fraction<span "
+      "class='glyphicon glyphicon-chevron-down' aria-hidden='true'></"
+      "span></th><th><span>Mature sequence<span class='glyphicon "
+      "glyphicon-chevron-down' aria-hidden='true'></span></span></"
+      "th><th><span>Start(mature)<span class='glyphicon "
+      "glyphicon-chevron-down' "
+      "aria-hidden='true'></span></span></th><th><span>Stop(mature)<span "
+      "class='glyphicon glyphicon-chevron-down' aria-hidden='true'></"
+      "span></th><th><span>Arm<span class='glyphicon glyphicon-chevron-down' "
+      "aria-hidden='true'></span></span></th><th><span>Star sequence<span "
+      "class='glyphicon glyphicon-chevron-down' aria-hidden='true'></"
+      "span></th><th><span>Start(star)<span class='glyphicon "
+      "glyphicon-chevron-down' aria-hidden='true'></span></span></"
+      "th><th><span>Stop(star)<span class='glyphicon glyphicon-chevron-down' "
+      "aria-hidden='true'></span></span></th></tr></thead><tbody>");
   return E_SUCCESS;
 }
 int write_html_table_row(FILE *fp, struct extended_candidate *ecand) {
@@ -745,13 +811,36 @@ int finalize_html_report(FILE *fp) {
   if (fp == NULL) {
     return E_FILE_WRITING_FAILED;
   }
-  fprintf(fp, "</tbody></"
-              "table><!--jQuery(necessaryforBootstrap'sJavaScriptplugins)--><"
-              "script src='https://code.jquery.com/jquery-1.11.2.min.js'></"
-              "script><!--Includeallcompiledplugins(below),"
-              "orincludeindividualfilesasneeded--><script src='https://"
-              "maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js'></"
-              "script></body></html>");
+  fprintf(fp,
+          "</tbody></"
+          "table><!--jQuery(necessaryforBootstrap'sJavaScriptplugins)--><"
+          "script src='https://code.jquery.com/jquery-1.11.2.min.js'></"
+          "script><!--Includeallcompiledplugins(below),"
+          "orincludeindividualfilesasneeded--><script src='https://"
+          "maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js'></"
+          "script><script>$(function() {  function get_comp_func(index, dir) { "
+          "   return function(a, b) {      var el1 = "
+          "$(a).find('td').get(index).innerHTML;      var el2 = "
+          "$(b).find('td').get(index).innerHTML;      tmp1 = parseFloat(el1);  "
+          "    tmp2 = parseFloat(el2);      if (isNaN(tmp1) || isNaN(tmp2)) {  "
+          "      var result = "
+          "el1.toLowerCase().localeCompare(el2.toLowerCase());        return "
+          "dir * result;      } else {        if (tmp1 > tmp2) {          "
+          "return dir;        } else {          return -dir;        }      }   "
+          " }  }  function sort_rows(th, index, dir) {    var dir = 1;    var "
+          "icon = $(th).find('.glyphicon');    if ($(icon).is(':visible')) {   "
+          "   if ($(icon).hasClass('glyphicon-chevron-down')) {        "
+          "$(icon).removeClass('glyphicon-chevron-down');        "
+          "$(icon).addClass('glyphicon-chevron-up');        dir = -1      } "
+          "else {        $(icon).removeClass('glyphicon-chevron-up');        "
+          "$(icon).addClass('glyphicon-chevron-down');        dir = 1;      }  "
+          "  } else {      $('.glyphicon').hide();      $(icon).show();    }   "
+          " var rows = $('tr').slice(1);    rows.sort(get_comp_func(index, "
+          "dir));    for (var i = 0; i < rows.length; i++) {      "
+          "rows[i].parentNode.appendChild(rows[i]);    }  }  "
+          "$('.glyphicon').hide();  $('th').each(function(index) {    "
+          "$(this).click(function() { sort_rows(this, index, 1); });  "
+          "})})</script></body></html>");
   return E_SUCCESS;
 }
 

@@ -38,6 +38,7 @@ int write_unique_reads_to_tex(FILE *fp, struct micro_rna_candidate *cand,
 int compile_tex_file(const char *tex_file_path, const char *output_path);
 int map_coverage_to_color_index(u32 *result, u32 coverage);
 int write_bed_lines(FILE *fp, struct extended_candidate *ecand);
+int write_gtf_line(FILE *fp, struct extended_candidate *ecand);
 int write_json_entry(FILE *fp, struct extended_candidate *ecand);
 int inititalize_html_report(FILE *fp);
 int write_html_table_row(FILE *fp, struct extended_candidate *ecand);

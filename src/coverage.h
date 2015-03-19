@@ -31,6 +31,8 @@ struct extended_candidate {
   struct candidate_subsequence *star_micro_rna;
   struct unique_read_list *mature_reads;
   struct unique_read_list *star_reads;
+  u32 total_reads;
+  double total_read_percent;
   int is_valid;
 };
 

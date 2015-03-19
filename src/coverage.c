@@ -51,8 +51,8 @@ int coverage(int argc, char **argv) {
 static int print_help() {
   printf("Description:\n"
          "    Coverage based verification on micro RNA candidates \n"
-         "Usage: miRA coverage <input miRA file> <input SAM file> <output "
-         "directory>\n");
+         "Usage: miRA coverage [-c config file] [-o output file] [-q] [-v] \n"
+         "    [-h] <input miRA file> <input SAM file> <output directory>\n");
   return E_SUCCESS;
 }
 
@@ -63,6 +63,7 @@ int coverage_main(struct configuration_params *config, char *mira_file,
   struct candidate_list *c_list = NULL;
   struct extended_candidate_list *ec_list = NULL;
   struct chrom_coverage *cov_table = NULL;
+  log_basic(config->log_level, "Coverage based verification...\n");
 
   err = read_candidate_file(&c_list, mira_file);
   if (err) {
@@ -86,10 +87,13 @@ int coverage_main(struct configuration_params *config, char *mira_file,
     goto error;
   }
   free_sam(sam);
+  log_basic(config->log_level, "Coverage based verification completed\n");
+  log_basic(config->log_level, "Generating reports...\n");
   err = report_valid_candiates(ec_list, &cov_table, output_path, config);
   if (err) {
     goto error;
   }
+  log_basic(config->log_level, "Generating reports completed\n");
   free_coverage_table(&cov_table);
   free_extended_candidate_list(ec_list);
   return E_SUCCESS;
@@ -542,6 +546,8 @@ int count_unique_reads(struct extended_candidate *ecand, struct sam_file *sam) {
   size_t global_star_start = cand->start + star_mirna->start - READCOUNT_FLANK;
   size_t global_star_end = cand->start + star_mirna->end + READCOUNT_FLANK;
 
+  ecand->total_reads = 0;
+
   for (size_t i = 0; i < sam->n; i++) {
     entry = sam->entries[i];
     long entry_start = entry->pos - 1;
@@ -578,7 +584,14 @@ int count_unique_reads(struct extended_candidate *ecand, struct sam_file *sam) {
         add_read_to_unique_read_list(star_reads, entry_start, entry->seq);
       }
     }
+    if (entry_start >= cand->start) {
+      u64 end = entry_start + strlen(entry->seq);
+      if (end <= cand->end) {
+        ecand->total_reads++;
+      }
+    }
   }
+  ecand->total_read_percent = (double)ecand->total_reads / sam->n;
   ecand->star_reads = star_reads;
   ecand->mature_reads = mature_reads;
   return E_SUCCESS;

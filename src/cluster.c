@@ -54,11 +54,12 @@ int cluster(int argc, char **argv) {
 }
 
 static int print_help() {
-  printf("Description:\n"
-         "    cluster generates a list of main expression contigs based on\n"
-         "    alignment data.\n"
-         "Usage: miRA cluster [-c config file] [-o output file] [-q] [-v] [-h] "
-         "<input SAM file> \n");
+  printf(
+      "Description:\n"
+      "    cluster generates a list of main expression contigs based on\n"
+      "    alignment data.\n"
+      "Usage: miRA cluster [-c config file] [-o output file] [-q] [-v] [-h]\n "
+      "    <input SAM file> \n");
   return E_SUCCESS;
 }
 
@@ -66,6 +67,7 @@ int cluster_main(struct configuration_params *config, char *sam_file,
                  char *output_file) {
   struct cluster_list *list = NULL;
   struct chrom_info *chromosome_table = NULL;
+  log_basic(config->log_level, "Clustering reads...\n");
 
   parse_clusters(&chromosome_table, &list, sam_file);
 
@@ -105,6 +107,7 @@ int cluster_main(struct configuration_params *config, char *sam_file,
 
   free_chromosome_table(&chromosome_table);
   free_clusters(list);
+  log_basic(config->log_level, "Clustering completed successfully.\n");
 
   return E_SUCCESS;
 

@@ -146,7 +146,14 @@ static int print_help() {
   printf("Description:\n"
          "    fold tries to fold rna sequences and calculates secondary\n"
          "    structure information \n"
-         "Usage: miRA fold <input BED file> <input FASTA file>\n");
+         "Usage: miRA fold [-c config file] [-o output file] [-q] [-v] [-h] \n"
+         "    <input BED file> <input FASTA file>\n"
+         "\n"
+         "Options:\n"
+         "-c <config file>\n"
+         "    pass a configuration file to the programm, containing parameters "
+
+         );
   return E_SUCCESS;
 }
 
@@ -215,20 +222,20 @@ int fold_sequences(struct sequence_list *seq_list,
                    struct configuration_params *config) {
   struct foldable_sequence *fs = NULL;
   struct structure_list *s_list = NULL;
-  size_t progress_count = 1;
+  size_t progress_count = 0;
 
   log_basic(config->log_level, "Initializing folding...\n");
 #ifdef _OPENMP
-#pragma omp parallel for private(fs, s_list)
+#pragma omp parallel for private(fs, s_list) schedule(dynamic)
 #endif
   for (size_t i = 0; i < seq_list->n; i++) {
-    log_basic(config->log_level, "Folding sequence %5ld \\%5ld \n",
-              progress_count, seq_list->n);
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
-    progress_count++;
 
+#pragma omp critical
+    {
+      progress_count++;
+      log_basic(config->log_level, "Folding sequence %5ld \\%5ld ... \n",
+                progress_count, seq_list->n);
+    }
     fs = seq_list->sequences[i];
     int max_length = fs->n;
     if (config->max_precursor_length > 0 &&
@@ -256,6 +263,7 @@ int fold_sequences(struct sequence_list *seq_list,
       write_foldable_sequence(NULL, fs);
     }
   }
+  log_basic(config->log_level, "Folding completed successfully.\n");
   return E_SUCCESS;
 };
 
@@ -486,6 +494,7 @@ int get_rand_int(int max) {
   } while (random_number >= limit);
   return random_number % max;
 }
+
 int fisher_yates_shuffle(char *seq, int n) {
   int j;
   char tmp;
@@ -497,6 +506,7 @@ int fisher_yates_shuffle(char *seq, int n) {
   }
   return E_SUCCESS;
 }
+
 int free_structure_info(struct structure_info *info) {
   free(info->structure_string);
   free(info);
