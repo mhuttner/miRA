@@ -13,7 +13,7 @@ enum log_level {
 
 struct configuration_params {
   int log_level;
-
+  int openmp_thread_count;
   int cluster_gap_size;
   int cluster_min_reads;
   int cluster_window_size;

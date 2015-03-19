@@ -66,6 +66,11 @@ int vfold(int argc, char *argv[]) {
 
 int vfold_main(struct configuration_params *config, char *bed_file,
                char *fasta_file, char *output_file) {
+
+#ifdef _OPENMP
+  omp_set_num_threads(config->openmp_thread_count);
+#endif
+
   struct cluster_list *c_list = NULL;
   struct genome_sequence *seq_table = NULL;
   struct sequence_list *seq_list = NULL;
@@ -210,14 +215,20 @@ int fold_sequences(struct sequence_list *seq_list,
                    struct configuration_params *config) {
   struct foldable_sequence *fs = NULL;
   struct structure_list *s_list = NULL;
+  size_t progress_count = 1;
 
   log_basic(config->log_level, "Initializing folding...\n");
 #ifdef _OPENMP
 #pragma omp parallel for private(fs, s_list)
 #endif
   for (size_t i = 0; i < seq_list->n; i++) {
-    log_basic(config->log_level, "Folding sequence %5ld \\%5ld \n", i + 1,
-              seq_list->n);
+    log_basic(config->log_level, "Folding sequence %5ld \\%5ld \n",
+              progress_count, seq_list->n);
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+    progress_count++;
+
     fs = seq_list->sequences[i];
     int max_length = fs->n;
     if (config->max_precursor_length > 0 &&

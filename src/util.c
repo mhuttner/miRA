@@ -10,6 +10,7 @@
 
 static void set_default_config(struct configuration_params *config) {
   config->log_level = LOG_LEVEL_BASIC;
+  config->openmp_thread_count = 1;
 
   config->cluster_gap_size = 10;
   config->cluster_min_reads = 10;
@@ -40,17 +41,19 @@ static int parse_config_file(struct configuration_params *config,
                              char *config_file) {
   const int MAXLINELENGTH = 1024;
   const char *integer_tokens[] = {
-      "log_level",                "cluster_gap_size",
-      "cluster_min_reads",        "cluster_window_size",
-      "cluster_max_length",       "max_precursor_length",
-      "min_precursor_length",     "max_hairpin_count",
-      "min_double_strand_length", "permutation_count",
-      "min_mature_strand_length", "max_mature_strand_length",
-      "allow_three_mismatches",   "allow_two_terminal_mismatches",
-      "create_coverage_plots",    "create_structure_images",
-      "create_coverage_images",   "cleanup_auxiliary_files"};
+      "log_level",                     "openmp_thread_count",
+      "cluster_gap_size",              "cluster_min_reads",
+      "cluster_window_size",           "cluster_max_length",
+      "max_precursor_length",          "min_precursor_length",
+      "max_hairpin_count",             "min_double_strand_length",
+      "permutation_count",             "min_mature_strand_length",
+      "max_mature_strand_length",      "allow_three_mismatches",
+      "allow_two_terminal_mismatches", "create_coverage_plots",
+      "create_structure_images",       "create_coverage_images",
+      "cleanup_auxiliary_files"};
   int integer_token_offsets[] = {
       (int)offsetof(struct configuration_params, log_level),
+      (int)offsetof(struct configuration_params, openmp_thread_count),
       (int)offsetof(struct configuration_params, cluster_gap_size),
       (int)offsetof(struct configuration_params, cluster_min_reads),
       (int)offsetof(struct configuration_params, cluster_window_size),
@@ -68,7 +71,7 @@ static int parse_config_file(struct configuration_params *config,
       (int)offsetof(struct configuration_params, create_structure_images),
       (int)offsetof(struct configuration_params, create_coverage_images),
       (int)offsetof(struct configuration_params, cleanup_auxiliary_files)};
-  const int integer_token_count = 18;
+  const int integer_token_count = 19;
   const char *double_tokens[] = {"min_mfe_per_nt", "max_pvalue", "min_coverage",
                                  "min_paired_fraction"};
   int double_token_offsets[] = {
@@ -203,6 +206,8 @@ int create_file_path(char **file_path, const char *path, const char *filename) {
 void log_configuration(struct configuration_params *config) {
   log_basic(config->log_level, "Configuartion Parameters:\n");
   log_basic(config->log_level, "    log_level %d\n", config->log_level);
+  log_basic(config->log_level, "    openmp_thread_count %d\n",
+            config->openmp_thread_count);
   log_basic(config->log_level, "    cluster_gap_size %d\n",
             config->cluster_gap_size);
   log_basic(config->log_level, "    cluster_min_reads %d\n",
