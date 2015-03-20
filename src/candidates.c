@@ -262,6 +262,8 @@ int parse_candidate_line(struct micro_rna_candidate **cand, char *line) {
   if (check == tokens[1] || *check != 0) {
     goto line_invalid;
   }
+  free(tokens[0]);
+  tokens[0] = NULL;
   free(tokens[1]);
   tokens[1] = NULL;
 
@@ -347,6 +349,7 @@ int parse_candidate_line(struct micro_rna_candidate **cand, char *line) {
   }
   free(tokens[17]);
   tokens[17] = NULL;
+  free(tokens);
 
   *cand = tmp_cand;
   return E_SUCCESS;
@@ -364,6 +367,7 @@ int free_candidate_list(struct candidate_list *cand_list) {
   for (size_t i = 0; i < cand_list->n; i++) {
     free_micro_rna_candidate(cand_list->candidates[i]);
   }
+  free(cand_list->candidates);
   free(cand_list);
   return E_SUCCESS;
 }

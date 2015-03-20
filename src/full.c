@@ -69,7 +69,7 @@ int full(int argc, char **argv) {
     return err;
   }
 
-  err = coverage_main(config, mira_file_path, sam_file, output_path);
+  err = coverage_main(config, argv[-1], mira_file_path, sam_file, output_path);
   free(bed_file_path);
   free(mira_file_path);
   free(config);

@@ -121,6 +121,7 @@ int free_sequence_table(struct genome_sequence *table) {
   struct genome_sequence *tmp = NULL;
   HASH_ITER(hh, table, s, tmp) {
     HASH_DEL(table, s);
+    free(s->data);
     free(s);
   }
   return E_SUCCESS;

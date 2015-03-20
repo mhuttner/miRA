@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <getopt.h>
 #include "coverage.h"
 #include "parse_sam.h"
@@ -42,8 +43,8 @@ int coverage(int argc, char **argv) {
   struct configuration_params *config = NULL;
   initialize_configuration(&config, config_file);
   log_configuration(config);
-  int err =
-      coverage_main(config, argv[optind], argv[optind + 1], argv[optind + 2]);
+  int err = coverage_main(config, argv[-1], argv[optind], argv[optind + 1],
+                          argv[optind + 2]);
   free(config);
   return err;
 }
@@ -56,14 +57,21 @@ static int print_help() {
   return E_SUCCESS;
 }
 
-int coverage_main(struct configuration_params *config, char *mira_file,
-                  char *sam_file, char *output_path) {
+int coverage_main(struct configuration_params *config, char *executable_file,
+                  char *mira_file, char *sam_file, char *output_path) {
   int err;
   struct sam_file *sam = NULL;
   struct candidate_list *c_list = NULL;
   struct extended_candidate_list *ec_list = NULL;
   struct chrom_coverage *cov_table = NULL;
   log_basic(config->log_level, "Coverage based verification...\n");
+
+  for (size_t i = strlen(executable_file); i > 0; i--) {
+    if (executable_file[i] == '/') {
+      executable_file[i] = 0;
+      break;
+    }
+  }
 
   err = read_candidate_file(&c_list, mira_file);
   if (err) {
@@ -89,7 +97,8 @@ int coverage_main(struct configuration_params *config, char *mira_file,
   free_sam(sam);
   log_basic(config->log_level, "Coverage based verification completed\n");
   log_basic(config->log_level, "Generating reports...\n");
-  err = report_valid_candiates(ec_list, &cov_table, output_path, config);
+  err = report_valid_candiates(ec_list, &cov_table, executable_file,
+                               output_path, config);
   if (err) {
     goto error;
   }
@@ -611,7 +620,7 @@ int create_unique_read(struct unique_read **read, u64 start, const char *seq) {
     return E_MALLOC_FAIL;
   }
   memcpy(read_tmp->seq, seq, l);
-  read_tmp->seq[l + 1] = 0;
+  read_tmp->seq[l] = 0;
   read_tmp->end = start + l;
   read_tmp->count = 1;
   *read = read_tmp;

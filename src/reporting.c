@@ -12,7 +12,7 @@
 
 int report_valid_candiates(struct extended_candidate_list *ec_list,
                            struct chrom_coverage **coverage_table,
-                           char *output_path,
+                           const char *executable_path, const char *output_path,
                            struct configuration_params *config) {
 
   char *cov_plot_path = NULL;
@@ -60,8 +60,8 @@ int report_valid_candiates(struct extended_candidate_list *ec_list,
       free(report_path);
       return E_CHROMOSOME_NOT_FOUND;
     }
-    create_candidate_report(ecand, chrom_cov, cov_plot_path, structure_path,
-                            coverage_path, report_path, config);
+    create_candidate_report(ecand, chrom_cov, executable_path, cov_plot_path,
+                            structure_path, coverage_path, report_path, config);
     write_bed_lines(bed_fp, ecand);
     write_gtf_line(gtf_fp, ecand);
     write_html_table_row(html_fp, ecand);
@@ -135,13 +135,11 @@ int create_directory_if_ne(const char *path) {
   return E_SUCCESS;
 }
 
-int create_candidate_report(struct extended_candidate *ecand,
-                            struct chrom_coverage *chrom_cov,
-                            const char *cov_plot_ouput_path,
-                            const char *structure_output_path,
-                            const char *coverage_output_path,
-                            const char *report_output_path,
-                            struct configuration_params *config) {
+int create_candidate_report(
+    struct extended_candidate *ecand, struct chrom_coverage *chrom_cov,
+    const char *executable_path, const char *cov_plot_ouput_path,
+    const char *structure_output_path, const char *coverage_output_path,
+    const char *report_output_path, struct configuration_params *config) {
   char *cov_plot_file = NULL;
   char *structure_file = NULL;
   char *coverage_file = NULL;
@@ -162,7 +160,8 @@ int create_candidate_report(struct extended_candidate *ecand,
 #endif /* HAVE_GNUPLOT */
 #ifdef HAVE_JAVA
   if (config->create_structure_images) {
-    err = create_structure_image(&structure_file, ecand, structure_output_path);
+    err = create_structure_image(&structure_file, ecand, executable_path,
+                                 structure_output_path);
     if (err != E_SUCCESS) {
       structure_file = NULL;
     }
@@ -171,8 +170,8 @@ int create_candidate_report(struct extended_candidate *ecand,
 
 #ifdef HAVE_JAVA
   if (config->create_coverage_images) {
-    err = create_coverage_image(&coverage_file, ecand, chrom_cov,
-                                coverage_output_path);
+    err = create_coverage_image(&coverage_file, ecand, executable_path,
+                                chrom_cov, coverage_output_path);
     if (err != E_SUCCESS) {
       coverage_file = NULL;
     }
@@ -294,9 +293,11 @@ int create_coverage_plot(char **result_file, struct extended_candidate *ecand,
 }
 
 int create_structure_image(char **result_file, struct extended_candidate *ecand,
+                           const char *executable_path,
                            const char *output_path) {
   const int SYS_CALL_MAX_LENGHT = 4096;
-  const char varna_path[] = "./VARNAv3-91.jar";
+  char *varna_path = NULL;
+  create_file_path(&varna_path, executable_path, "VARNAv3-91.jar");
   const char varna_class_name[] = "fr.orsay.lri.varna.applications.VARNAcmd";
   const char varna_algorith[] = "naview";
   const char varna_auto_interior_loops[] = "True";
@@ -338,6 +339,7 @@ int create_structure_image(char **result_file, struct extended_candidate *ecand,
            varna_auto_interior_loops, varna_auto_terminal_loops,
            varna_resolution, m_start, m_end, hex_color_red, s_start, s_end,
            hex_color_blue, cand->id, seq, structure, file_path);
+  free(varna_path);
   int err = system(java_system_call);
 
   if (err != 0) {
@@ -349,9 +351,11 @@ int create_structure_image(char **result_file, struct extended_candidate *ecand,
 }
 
 int create_coverage_image(char **result_file, struct extended_candidate *ecand,
+                          const char *executable_path,
                           struct chrom_coverage *chrom_cov,
                           const char *output_path) {
-  const char varna_path[] = "./VARNAv3-91.jar";
+  char *varna_path = NULL;
+  create_file_path(&varna_path, executable_path, "VARNAv3-91.jar");
   const char varna_class_name[] = "fr.orsay.lri.varna.applications.VARNAcmd";
   const char varna_algorith[] = "naview";
   const char varna_auto_interior_loops[] = "True";
@@ -406,8 +410,10 @@ int create_coverage_image(char **result_file, struct extended_candidate *ecand,
            varna_auto_interior_loops, varna_auto_terminal_loops,
            varna_resolution, highlight_string, cand->id, seq, structure,
            file_path);
+  free(varna_path);
   int err = system(java_system_call);
-
+  free(highlight_string);
+  free(java_system_call);
   if (err != 0) {
     free(file_path);
     return E_JAVA_SYSTEM_CALL_FAILED;

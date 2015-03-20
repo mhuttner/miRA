@@ -169,7 +169,7 @@ int parse_bed_line(struct cluster **result, char *line) {
   free(tokens[9]);
   tokens[9] = NULL;
   *result = c;
-
+  free(tokens);
   return E_SUCCESS;
 line_invalid:
   for (int i = 0; i < num_entries; i++) {

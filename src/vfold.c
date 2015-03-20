@@ -121,6 +121,7 @@ int vfold_main(struct configuration_params *config, char *bed_file,
   free(mira_output_file);
 
   free_sequence_list(seq_list);
+  free_candidate_list(cand_list);
 
   return E_SUCCESS;
 convert_error:

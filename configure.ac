@@ -1,4 +1,4 @@
-AC_INIT([miRA], [1.0.0_rc2], [michael@mhuttner.com],
+AC_INIT([miRA], [1.0.1], [michael@mhuttner.com],
         [miRA], [http://mhuttner.com/])
 AC_PREREQ([2.68])
 
@@ -22,6 +22,7 @@ AC_CHECK_LIB([m], [exp])
 AC_HEADER_STDC
 AC_HEADER_STDBOOL
 AC_CHECK_HEADERS([malloc.h float.h limits.h stdlib.h string.h strings.h unistd.h unistd.h math.h])
+
 
 
 AC_FUNC_MALLOC

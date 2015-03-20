@@ -4,7 +4,7 @@
 
 int report_valid_candiates(struct extended_candidate_list *ec_list,
                            struct chrom_coverage **coverage_table,
-                           char *output_path,
+                           const char *executable_path, const char *output_path,
                            struct configuration_params *config);
 int create_output_directory_structure(char **cov_plot_ouput_path,
                                       char **structure_output_path,
@@ -12,19 +12,19 @@ int create_output_directory_structure(char **cov_plot_ouput_path,
                                       char **report_output_path,
                                       const char *output_path);
 int create_directory_if_ne(const char *path);
-int create_candidate_report(struct extended_candidate *ecand,
-                            struct chrom_coverage *chrom_cov,
-                            const char *cov_plot_ouput_path,
-                            const char *structure_output_path,
-                            const char *coverage_output_path,
-                            const char *report_output_path,
-                            struct configuration_params *config);
+int create_candidate_report(
+    struct extended_candidate *ecand, struct chrom_coverage *chrom_cov,
+    const char *executable_path, const char *cov_plot_ouput_path,
+    const char *structure_output_path, const char *coverage_output_path,
+    const char *report_output_path, struct configuration_params *config);
 int create_coverage_plot(char **result_file, struct extended_candidate *ecand,
                          struct chrom_coverage *chrom_cov,
                          const char *output_path);
 int create_structure_image(char **result_file, struct extended_candidate *ecand,
+                           const char *executable_path,
                            const char *output_path);
 int create_coverage_image(char **result_file, struct extended_candidate *ecand,
+                          const char *executable_path,
                           struct chrom_coverage *chrom_cov,
                           const char *output_path);
 int create_latex_template(char **tex_file, struct extended_candidate *ecand,

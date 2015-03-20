@@ -84,8 +84,6 @@ int parse_line(struct sam_entry **entry, char *line) {
   const int num_entries = 11;
   const char header_line_marker = '@';
 
-  struct sam_entry *e = (struct sam_entry *)malloc(sizeof(struct sam_entry));
-
   char *start = line;
   char *end = NULL;
   if (line[0] == header_line_marker)
@@ -128,6 +126,8 @@ int parse_line(struct sam_entry **entry, char *line) {
     free(tokens);
     return E_INVALID_SAM_LINE;
   }
+
+  struct sam_entry *e = (struct sam_entry *)malloc(sizeof(struct sam_entry));
 
   char *check = NULL;
 
@@ -178,6 +178,7 @@ int parse_line(struct sam_entry **entry, char *line) {
       free(tokens[i]);
     }
     free(tokens);
+    free(e);
     return E_INVALID_SAM_LINE;
   }
 }
@@ -188,8 +189,6 @@ int parse_header(struct sq_header **header, char *line) {
   const char *sq_ln_marker = "LN:";
   const int marker_length = 3;
   const char seperator = '\t';
-
-  struct sq_header *h = (struct sq_header *)malloc(sizeof(struct sq_header));
 
   if (strncmp(line, sq_header_marker, marker_length) != 0) {
     return E_SAM_NON_SQ_HEADER;
@@ -229,6 +228,8 @@ int parse_header(struct sq_header **header, char *line) {
     free(sn);
     return E_INVALID_SAM_LINE;
   }
+  struct sq_header *h = (struct sq_header *)malloc(sizeof(struct sq_header));
+
   h->sn = sn;
   h->ln = ln;
   *header = h;

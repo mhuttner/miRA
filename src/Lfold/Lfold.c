@@ -174,6 +174,7 @@ void free_structure_list(struct structure_list *list) {
   for (size_t i = 0; i < list->n; i++) {
     free_secondary_structure(list->structures[i]);
   }
+  free(list->structures);
   free(list);
 }
 void free_secondary_structure(struct secondary_structure *s) {
