@@ -7,7 +7,7 @@ M. Evers, A. Dueck, G. Meister and J. C. Engelmann
 
 ### How to install:
 For an easy setup simply download the 
-latest bundeled release archive: [miRA-1.0.0_rc2.tar.gz](miRA-1.0.0_rc2.tar.gz)
+latest bundeled release archive: [miRA-1.0.1.tar.gz](miRA-1.0.1.tar.gz)
 
 unpack it, using for example
 ```sh
