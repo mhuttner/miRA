@@ -793,12 +793,13 @@ int write_html_table_row(FILE *fp, struct extended_candidate *ecand) {
   struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
   struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
   fprintf(fp, "<tr><td ><a "
-              "href=''>Cluster_%lld_%s</a></td><td>%s</td><td>%s</td><td>%lld</"
+              "href='reports/Cluster_%lld_report.pdf'>Cluster_%lld_%s</a></"
+              "td><td>%s</td><td>%s</td><td>%lld</"
               "td><td>%lld</td><td>%7.5lf "
               "</td><td>%7.5le</td><td>%7.5lf</td><td>",
-          cand->id, (cand->strand == '-') ? "minus" : "plus", cand->chrom,
-          (cand->strand == '-') ? "minus" : "plus", cand->start, cand->end,
-          cand->mfe, cand->pvalue, cand->paired_fraction);
+          cand->id, cand->id, (cand->strand == '-') ? "minus" : "plus",
+          cand->chrom, (cand->strand == '-') ? "minus" : "plus", cand->start,
+          cand->end, cand->mfe, cand->pvalue, cand->paired_fraction);
   for (u32 i = mature_mirna->start; i < mature_mirna->end; i++) {
     fprintf(fp, "%c", cand->sequence[i]);
   }

@@ -54,7 +54,7 @@ EXTRA_PROGRAMS = miRAtest
 miRAtestdir = test
 miRAtest_SOURCES = test/main.c test/testerino.c test/test_cluster.c test/test_parse_sam.c test/test_bed_file_io.c src/errors.c src/parse_sam.c src/cluster.c src/vfold.c src/bed.c src/fasta.c test/test_fasta.c test/test_vfold.c src/util.c test/test_util.c src/structure_evaluation.c src/candidates.c src/coverage.c src/reporting.c src/full.c
 miRAtest_HEADERS = test/testerino.h test/test_cluster.h test/test_parse_sam.h test/test_bed_file_io.h src/errors.h src/parse_sam.h src/cluster.h src/vfold.h src/bed.h src/fasta.h test/test_fasta.h test/test_vfold.h src/util.h test/test_util.h src/structure_evaluation.h src/candidates.h src/coverage.h src/reporting.h src/full.h src/defs.h src/uthash.h
-miRAtest_CFLAGS = -std=c99
+miRAtest_CFLAGS = -std=c99 $(OPENMP_CFLAGS)
 miRAtest_LDADD = libLfold.a
 
 .PHONY: clean test
