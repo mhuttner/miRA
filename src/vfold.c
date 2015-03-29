@@ -400,7 +400,7 @@ int check_folding_constraints(struct foldable_sequence *fs,
       config->min_double_strand_length) {
     goto invalid_structure;
   }
-  if (si->mfe >= config->min_mfe_per_nt) {
+  if (si->mfe >= config->max_mfe_per_nt) {
     goto invalid_structure;
   }
   si->is_valid = 1;

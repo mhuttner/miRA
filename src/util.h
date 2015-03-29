@@ -16,26 +16,26 @@ struct configuration_params {
   int openmp_thread_count;
   int cluster_gap_size;
   int cluster_min_reads;
-  int cluster_window_size;
+  int cluster_flank_size;
   int cluster_max_length;
 
   int max_precursor_length;
   int min_precursor_length;
-  double min_mfe_per_nt;
+  double max_mfe_per_nt;
   int max_hairpin_count;
   int min_double_strand_length;
   int permutation_count;
   double max_pvalue;
   double min_coverage;
   double min_paired_fraction;
-  int min_mature_strand_length;
-  int max_mature_strand_length;
+  int min_duplex_length;
+  int max_duplex_length;
   int allow_three_mismatches;
   int allow_two_terminal_mismatches;
 
   int create_coverage_plots;
-  int create_structure_images;
-  int create_coverage_images;
+  int create_structure_plots;
+  int create_structure_coverage_plots;
   int cleanup_auxiliary_files;
 };
 

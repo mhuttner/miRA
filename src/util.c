@@ -14,12 +14,12 @@ static void set_default_config(struct configuration_params *config) {
 
   config->cluster_gap_size = 10;
   config->cluster_min_reads = 10;
-  config->cluster_window_size = 200;
+  config->cluster_flank_size = 200;
   config->cluster_max_length = 2000;
 
   config->max_precursor_length = 0;
   config->min_precursor_length = 50;
-  config->min_mfe_per_nt = -0.4;
+  config->max_mfe_per_nt = -0.4;
   config->max_hairpin_count = 4;
   config->min_double_strand_length = 20;
   config->permutation_count = 100;
@@ -27,13 +27,13 @@ static void set_default_config(struct configuration_params *config) {
 
   config->min_coverage = 0.0001;
   config->min_paired_fraction = 0.67;
-  config->min_mature_strand_length = 18;
-  config->max_mature_strand_length = 30;
+  config->min_duplex_length = 18;
+  config->max_duplex_length = 30;
   config->allow_three_mismatches = 0;
   config->allow_two_terminal_mismatches = 0;
   config->create_coverage_plots = 1;
-  config->create_structure_images = 1;
-  config->create_coverage_images = 1;
+  config->create_structure_plots = 1;
+  config->create_structure_coverage_plots = 1;
   config->cleanup_auxiliary_files = 1;
 }
 
@@ -43,39 +43,39 @@ static int parse_config_file(struct configuration_params *config,
   const char *integer_tokens[] = {
       "log_level",                     "openmp_thread_count",
       "cluster_gap_size",              "cluster_min_reads",
-      "cluster_window_size",           "cluster_max_length",
+      "cluster_flank_size",           "cluster_max_length",
       "max_precursor_length",          "min_precursor_length",
       "max_hairpin_count",             "min_double_strand_length",
-      "permutation_count",             "min_mature_strand_length",
-      "max_mature_strand_length",      "allow_three_mismatches",
+      "permutation_count",             "min_duplex_length",
+      "max_duplex_length",      "allow_three_mismatches",
       "allow_two_terminal_mismatches", "create_coverage_plots",
-      "create_structure_images",       "create_coverage_images",
+      "create_structure_plots",       "create_structure_coverage_plots",
       "cleanup_auxiliary_files"};
   int integer_token_offsets[] = {
       (int)offsetof(struct configuration_params, log_level),
       (int)offsetof(struct configuration_params, openmp_thread_count),
       (int)offsetof(struct configuration_params, cluster_gap_size),
       (int)offsetof(struct configuration_params, cluster_min_reads),
-      (int)offsetof(struct configuration_params, cluster_window_size),
+      (int)offsetof(struct configuration_params, cluster_flank_size),
       (int)offsetof(struct configuration_params, cluster_max_length),
       (int)offsetof(struct configuration_params, max_precursor_length),
       (int)offsetof(struct configuration_params, min_precursor_length),
       (int)offsetof(struct configuration_params, max_hairpin_count),
       (int)offsetof(struct configuration_params, min_double_strand_length),
       (int)offsetof(struct configuration_params, permutation_count),
-      (int)offsetof(struct configuration_params, min_mature_strand_length),
-      (int)offsetof(struct configuration_params, max_mature_strand_length),
+      (int)offsetof(struct configuration_params, min_duplex_length),
+      (int)offsetof(struct configuration_params, max_duplex_length),
       (int)offsetof(struct configuration_params, allow_three_mismatches),
       (int)offsetof(struct configuration_params, allow_two_terminal_mismatches),
       (int)offsetof(struct configuration_params, create_coverage_plots),
-      (int)offsetof(struct configuration_params, create_structure_images),
-      (int)offsetof(struct configuration_params, create_coverage_images),
+      (int)offsetof(struct configuration_params, create_structure_plots),
+      (int)offsetof(struct configuration_params, create_structure_coverage_plots),
       (int)offsetof(struct configuration_params, cleanup_auxiliary_files)};
   const int integer_token_count = 19;
-  const char *double_tokens[] = {"min_mfe_per_nt", "max_pvalue", "min_coverage",
+  const char *double_tokens[] = {"max_mfe_per_nt", "max_pvalue", "min_coverage",
                                  "min_paired_fraction"};
   int double_token_offsets[] = {
-      (int)offsetof(struct configuration_params, min_mfe_per_nt),
+      (int)offsetof(struct configuration_params, max_mfe_per_nt),
       (int)offsetof(struct configuration_params, max_pvalue),
       (int)offsetof(struct configuration_params, min_coverage),
       (int)offsetof(struct configuration_params, min_paired_fraction)};
@@ -212,16 +212,16 @@ void log_configuration(struct configuration_params *config) {
             config->cluster_gap_size);
   log_basic(config->log_level, "    cluster_min_reads %d\n",
             config->cluster_min_reads);
-  log_basic(config->log_level, "    cluster_window_size %d\n",
-            config->cluster_window_size);
+  log_basic(config->log_level, "    cluster_flank_size %d\n",
+            config->cluster_flank_size);
   log_basic(config->log_level, "    cluster_max_length %d\n",
             config->cluster_max_length);
   log_basic(config->log_level, "    max_precursor_length %d\n",
             config->max_precursor_length);
   log_basic(config->log_level, "    min_precursor_length %d\n",
             config->min_precursor_length);
-  log_basic(config->log_level, "    min_mfe_per_nt %lf\n",
-            config->min_mfe_per_nt);
+  log_basic(config->log_level, "    max_mfe_per_nt %lf\n",
+            config->max_mfe_per_nt);
   log_basic(config->log_level, "    max_hairpin_count %d\n",
             config->max_hairpin_count);
   log_basic(config->log_level, "    min_double_strand_length %d\n",
@@ -232,20 +232,20 @@ void log_configuration(struct configuration_params *config) {
   log_basic(config->log_level, "    min_coverage %lf\n", config->min_coverage);
   log_basic(config->log_level, "    min_paired_fraction %lf\n",
             config->min_paired_fraction);
-  log_basic(config->log_level, "    min_mature_strand_length %d\n",
-            config->min_mature_strand_length);
-  log_basic(config->log_level, "    max_mature_strand_length %d\n",
-            config->max_mature_strand_length);
+  log_basic(config->log_level, "    min_duplex_length %d\n",
+            config->min_duplex_length);
+  log_basic(config->log_level, "    max_duplex_length %d\n",
+            config->max_duplex_length);
   log_basic(config->log_level, "    allow_three_mismatches %d\n",
             config->allow_three_mismatches);
   log_basic(config->log_level, "    allow_two_terminal_mismatches %d\n",
             config->allow_two_terminal_mismatches);
   log_basic(config->log_level, "    create_coverage_plots %d\n",
             config->create_coverage_plots);
-  log_basic(config->log_level, "    create_structure_images %d\n",
-            config->create_structure_images);
-  log_basic(config->log_level, "    create_coverage_images %d\n",
-            config->create_coverage_images);
+  log_basic(config->log_level, "    create_structure_plots %d\n",
+            config->create_structure_plots);
+  log_basic(config->log_level, "    create_structure_coverage_plots %d\n",
+            config->create_structure_coverage_plots);
   log_basic(config->log_level, "    cleanup_auxiliary_files %d\n",
             config->cleanup_auxiliary_files);
   log_basic(config->log_level, "\n\n");

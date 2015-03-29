@@ -159,7 +159,7 @@ int create_candidate_report(
   }
 #endif /* HAVE_GNUPLOT */
 #ifdef HAVE_JAVA
-  if (config->create_structure_images) {
+  if (config->create_structure_plots) {
     err = create_structure_image(&structure_file, ecand, executable_path,
                                  structure_output_path);
     if (err != E_SUCCESS) {
@@ -169,7 +169,7 @@ int create_candidate_report(
 #endif /* HAVE_JAVA */
 
 #ifdef HAVE_JAVA
-  if (config->create_coverage_images) {
+  if (config->create_structure_coverage_plots) {
     err = create_coverage_image(&coverage_file, ecand, executable_path,
                                 chrom_cov, coverage_output_path);
     if (err != E_SUCCESS) {

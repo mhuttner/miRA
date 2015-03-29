@@ -256,10 +256,10 @@ int find_mature_micro_rna(struct extended_candidate *ecand,
       if (length <= 0) {
         continue;
       }
-      if (length < config->min_mature_strand_length) {
+      if (length < config->min_duplex_length) {
         continue;
       }
-      if (length >= config->max_mature_strand_length) {
+      if (length >= config->max_duplex_length) {
         continue;
       }
       double paired_fraction = 0.0;
@@ -341,8 +341,8 @@ int find_star_micro_rna(struct extended_candidate *ecand,
     star_end = n;
   }
   size_t l = star_end - star_start;
-  if (l < config->min_mature_strand_length ||
-      l >= config->max_mature_strand_length) {
+  if (l < config->min_duplex_length ||
+      l >= config->max_duplex_length) {
     return E_NO_STAR_MI_RNA_FOUND;
   }
 

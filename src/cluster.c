@@ -86,7 +86,7 @@ int cluster_main(struct configuration_params *config, char *sam_file,
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
-  err = extend_clusters(list, &chromosome_table, config->cluster_window_size);
+  err = extend_clusters(list, &chromosome_table, config->cluster_flank_size);
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
