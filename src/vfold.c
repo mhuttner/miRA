@@ -44,8 +44,10 @@ int vfold(int argc, char *argv[]) {
       return E_SUCCESS;
     case 'v':
       log_level = LOG_LEVEL_VERBOSE;
+      break;
     case 'q':
       log_level = LOG_LEVEL_QUIET;
+      break;
     default:
       break;
     }
@@ -57,6 +59,7 @@ int vfold(int argc, char *argv[]) {
   }
   struct configuration_params *config = NULL;
   initialize_configuration(&config, config_file);
+  config->log_level = log_level;
   log_configuration(config);
   int err;
   err = vfold_main(config, argv[optind], argv[optind + 1], output_file);
@@ -223,19 +226,33 @@ int fold_sequences(struct sequence_list *seq_list,
                    struct configuration_params *config) {
   struct foldable_sequence *fs = NULL;
   struct structure_list *s_list = NULL;
+  struct text_buffer *buf = NULL;
+  struct text_buffer **buffers = (struct text_buffer **)malloc(
+      config->openmp_thread_count * sizeof(struct text_buffer *));
+  for (int i = 0; i < config->openmp_thread_count; i++) {
+    buffers[i] = NULL;
+    create_text_buffer(&buffers[i]);
+  }
+
   size_t progress_count = 0;
 
-  log_basic(config->log_level, "Initializing folding...\n");
-#ifdef _OPENMP
-#pragma omp parallel for private(fs, s_list) schedule(dynamic)
-#endif
+  log_basic_timestamp(config->log_level, "Initializing folding...\n");
+#pragma omp parallel for private(fs, s_list,                                   \
+                                 buf) shared(buffers) schedule(dynamic)
   for (size_t i = 0; i < seq_list->n; i++) {
+#ifdef _OPENMP
+    int tid = omp_get_thread_num();
+    buf = buffers[tid];
+#else
+    buf = buffers[0];
+#endif
 
 #pragma omp critical
     {
       progress_count++;
-      log_basic(config->log_level, "Folding sequence %5ld \\%5ld ... \n",
-                progress_count, seq_list->n);
+      log_basic_timestamp(config->log_level,
+                          "Folding sequence %5ld \\%5ld ... \n", progress_count,
+                          seq_list->n);
     }
     fs = seq_list->sequences[i];
     int max_length = fs->n;
@@ -247,24 +264,74 @@ int fold_sequences(struct sequence_list *seq_list,
     find_optimal_structure(s_list, fs, config);
     free_structure_list(s_list);
     if (fs->structure == NULL) {
+      print_to_text_buffer(
+          buf,
+          "Cluster %lld \x1b[32m[INVALID]\x1b[0m \n\t No structure found \n",
+          fs->c->id);
       continue;
     }
     evaluate_structure(fs->structure);
 
-    check_folding_constraints(fs, config);
+    int err = check_folding_constraints(fs, config);
     if (fs->structure->is_valid == 0) {
+      switch (err) {
+      case E_STRUCTURE_TOO_SHORT:
+        print_to_text_buffer(
+            buf, "Cluster %lld \x1b[31m[INVALID]\x1b[0m "
+                 "\n\t The structure is to short (length: %ld, min: %d) \n",
+            fs->c->id, fs->structure->n, config->min_precursor_length);
+        break;
+      case E_STRUCTURE_HAS_TO_MANY_HAIRPINS:
+        print_to_text_buffer(
+            buf, "Cluster %lld \x1b[31m[INVALID]\x1b[0m \n\t The structure "
+                 "has to many hairpins (has: %d max: %d)\n",
+            fs->c->id, fs->structure->external_loop_count,
+            config->max_hairpin_count);
+        break;
+      case E_STRUCTURE_HAT_TO_SHORT_STEM:
+        print_to_text_buffer(
+            buf,
+            "Cluster %lld \x1b[31m[INVALID]\x1b[0m \n\t The structure stem "
+            "section is too short (length: %d min: %d)\n",
+            fs->c->id, abs(fs->structure->stem_end_with_mismatch -
+                           fs->structure->stem_start_with_mismatch) +
+                           1,
+            config->min_double_strand_length);
+        break;
+      case E_STRUCTURE_MFE_TO_HIGH:
+        print_to_text_buffer(
+            buf, "Cluster %lld \x1b[31m[INVALID]\x1b[0m \n\t The structure "
+                 "mfe is to high (mfe: %7.5e max: "
+                 "%7.5e)\n",
+            fs->c->id, fs->structure->mfe, config->max_mfe_per_nt);
+        break;
+      default:
+        print_to_text_buffer(buf, "Cluster %lld \x1b[31m[INVALID]\x1b[0m "
+                                  "\n\t Something unknown went wrong.  "
+                                  "\n",
+                             fs->c->id);
+        break;
+      }
       continue;
     }
     calculate_mfe_distribution(fs, config->permutation_count);
     check_pvalue(fs, config);
     if (fs->structure->is_valid == 0) {
+      print_to_text_buffer(
+          buf, "Cluster %lld \x1b[31m[INVALID]\x1b[0m \n\t The structure "
+               "pvalue is to high (p: %7.5e max: %7.5e\n",
+          fs->c->id, fs->structure->pvalue, config->max_pvalue);
       continue;
     }
-    if (config->log_level == LOG_LEVEL_VERBOSE) {
-      write_foldable_sequence(NULL, fs);
-    }
+    print_to_text_buffer(buf, "Cluster %lld \x1b[32m[VALID]\x1b[0m \n",
+                         fs->c->id);
   }
-  log_basic(config->log_level, "Folding completed successfully.\n");
+  for (int i = 0; i < config->openmp_thread_count; i++) {
+    printf("Thread %d:\n", i);
+    printf("%s", buffers[i]->start);
+    free_text_buffer(buffers[i]);
+  }
+  log_basic_timestamp(config->log_level, "Folding completed successfully.\n");
   return E_SUCCESS;
 };
 
@@ -390,17 +457,22 @@ int find_optimal_structure(struct structure_list *s_list,
 int check_folding_constraints(struct foldable_sequence *fs,
                               struct configuration_params *config) {
   struct structure_info *si = fs->structure;
+  int err = E_SUCCESS;
   if (si->n < config->min_precursor_length) {
+    err = E_STRUCTURE_TOO_SHORT;
     goto invalid_structure;
   }
   if (si->external_loop_count >= config->max_hairpin_count) {
+    err = E_STRUCTURE_HAS_TO_MANY_HAIRPINS;
     goto invalid_structure;
   }
   if (abs(si->stem_end_with_mismatch - si->stem_start_with_mismatch) + 1 <
       config->min_double_strand_length) {
+    err = E_STRUCTURE_HAT_TO_SHORT_STEM;
     goto invalid_structure;
   }
   if (si->mfe >= config->max_mfe_per_nt) {
+    err = E_STRUCTURE_MFE_TO_HIGH;
     goto invalid_structure;
   }
   si->is_valid = 1;
@@ -408,13 +480,13 @@ int check_folding_constraints(struct foldable_sequence *fs,
 
 invalid_structure:
   si->is_valid = 0;
-  return E_STRUCTURE_IS_INVALID;
+  return err;
 }
 int check_pvalue(struct foldable_sequence *fs,
                  struct configuration_params *config) {
   if (fs->structure->pvalue > config->max_pvalue) {
     fs->structure->is_valid = 0;
-    return E_STRUCTURE_IS_INVALID;
+    return E_STRUCTURE_PVALUE_TO_HIGH;
   }
   return E_SUCCESS;
 }

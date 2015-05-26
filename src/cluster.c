@@ -33,8 +33,10 @@ int cluster(int argc, char **argv) {
       return E_SUCCESS;
     case 'v':
       log_level = LOG_LEVEL_VERBOSE;
+      break;
     case 'q':
       log_level = LOG_LEVEL_QUIET;
+      break;
     default:
       break;
     }
@@ -46,6 +48,7 @@ int cluster(int argc, char **argv) {
   }
   struct configuration_params *config = NULL;
   initialize_configuration(&config, config_file);
+  config->log_level = log_level;
   log_configuration(config);
   int err;
   err = cluster_main(config, argv[optind], output_file);
@@ -67,7 +70,7 @@ int cluster_main(struct configuration_params *config, char *sam_file,
                  char *output_file) {
   struct cluster_list *list = NULL;
   struct chrom_info *chromosome_table = NULL;
-  log_basic(config->log_level, "Clustering reads...\n");
+  log_basic_timestamp(config->log_level, "Clustering reads...\n");
 
   parse_clusters(&chromosome_table, &list, sam_file);
 
@@ -107,7 +110,8 @@ int cluster_main(struct configuration_params *config, char *sam_file,
 
   free_chromosome_table(&chromosome_table);
   free_clusters(list);
-  log_basic(config->log_level, "Clustering completed successfully.\n");
+  log_basic_timestamp(config->log_level,
+                      "Clustering completed successfully.\n");
 
   return E_SUCCESS;
 

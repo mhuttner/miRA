@@ -29,8 +29,10 @@ int coverage(int argc, char **argv) {
       return E_SUCCESS;
     case 'v':
       log_level = LOG_LEVEL_VERBOSE;
+      break;
     case 'q':
       log_level = LOG_LEVEL_QUIET;
+      break;
     default:
       break;
     }
@@ -42,6 +44,7 @@ int coverage(int argc, char **argv) {
   }
   struct configuration_params *config = NULL;
   initialize_configuration(&config, config_file);
+  config->log_level = log_level;
   log_configuration(config);
   int err = coverage_main(config, argv[-1], argv[optind], argv[optind + 1],
                           argv[optind + 2]);
@@ -64,7 +67,7 @@ int coverage_main(struct configuration_params *config, char *executable_file,
   struct candidate_list *c_list = NULL;
   struct extended_candidate_list *ec_list = NULL;
   struct chrom_coverage *cov_table = NULL;
-  log_basic(config->log_level, "Coverage based verification...\n");
+  log_basic_timestamp(config->log_level, "Coverage based verification...\n");
 
   for (size_t i = strlen(executable_file); i > 0; i--) {
     if (executable_file[i] == '/') {
@@ -95,14 +98,15 @@ int coverage_main(struct configuration_params *config, char *executable_file,
     goto error;
   }
   free_sam(sam);
-  log_basic(config->log_level, "Coverage based verification completed\n");
-  log_basic(config->log_level, "Generating reports...\n");
+  log_basic_timestamp(config->log_level,
+                      "Coverage based verification completed\n");
+  log_basic_timestamp(config->log_level, "Generating reports...\n");
   err = report_valid_candiates(ec_list, &cov_table, executable_file,
                                output_path, config);
   if (err) {
     goto error;
   }
-  log_basic(config->log_level, "Generating reports completed\n");
+  log_basic_timestamp(config->log_level, "Generating reports completed\n");
   free_coverage_table(&cov_table);
   free_extended_candidate_list(ec_list);
   return E_SUCCESS;
@@ -236,17 +240,20 @@ int find_mature_micro_rna(struct extended_candidate *ecand,
 
   for (size_t i = 0; i < (n - 1); i++) {
     u64 global_index = cand->start + i;
-    double cov_local = (double)cov_list[global_index] / total_coverage;
-    double cov_next = (double)cov_list[global_index + 1] / total_coverage;
-    if (cov_next - cov_local > config->min_coverage) {
+    double cov_local = (double)cov_list[global_index];
+    double cov_next = (double)cov_list[global_index + 1];
+    if (cov_next - cov_local > 10e-6) {
       pos_cov_spikes[pos_spike_count] = i;
       pos_spike_count++;
     }
-    if (cov_local - cov_next > config->min_coverage) {
+    if (cov_local - cov_next > 10e-6) {
       neg_cov_spikes[neg_spike_count] = i;
       neg_spike_count++;
     }
   }
+  printf("pos spikes: %ld\n", pos_spike_count);
+  printf("neg spikes: %ld\n", neg_spike_count);
+  printf("Iterations: %ld\n", pos_spike_count * neg_spike_count);
 
   for (size_t i = 0; i < pos_spike_count; i++) {
     for (size_t j = 0; j < neg_spike_count; j++) {
@@ -341,8 +348,7 @@ int find_star_micro_rna(struct extended_candidate *ecand,
     star_end = n;
   }
   size_t l = star_end - star_start;
-  if (l < config->min_duplex_length ||
-      l >= config->max_duplex_length) {
+  if (l < config->min_duplex_length || l >= config->max_duplex_length) {
     return E_NO_STAR_MI_RNA_FOUND;
   }
 

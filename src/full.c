@@ -16,8 +16,9 @@ int full(int argc, char **argv) {
   int c;
   int log_level = LOG_LEVEL_BASIC;
 
-  while ((c = getopt(argc, argv, "c:hvq")) != -1) {
+  while ((c = getopt(argc, argv, "c:s:hvq")) != -1) {
     switch (c) {
+    case 's':
     case 'c':
       config_file = optarg;
       break;
@@ -26,8 +27,10 @@ int full(int argc, char **argv) {
       return E_SUCCESS;
     case 'v':
       log_level = LOG_LEVEL_VERBOSE;
+      break;
     case 'q':
       log_level = LOG_LEVEL_QUIET;
+      break;
     default:
       break;
     }
@@ -39,6 +42,7 @@ int full(int argc, char **argv) {
   }
   struct configuration_params *config = NULL;
   initialize_configuration(&config, config_file);
+  config->log_level = log_level;
   log_configuration(config);
 
   int err;

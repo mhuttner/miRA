@@ -146,8 +146,9 @@ int create_candidate_report(
   char *tex_file = NULL;
   int err;
 
-  log_basic(config->log_level, "\tGenerating report for cluster %lld...\n",
-            ecand->cand->id);
+  log_basic_timestamp(config->log_level,
+                      "\tGenerating report for cluster %lld...\n",
+                      ecand->cand->id);
 #ifdef HAVE_GNUPLOT
   if (config->create_coverage_plots) {
 

@@ -39,6 +39,17 @@ struct configuration_params {
   int cleanup_auxiliary_files;
 };
 
+struct text_buffer {
+  char *data;
+  char *start;
+  size_t capacity;
+  size_t free_space;
+};
+
+int create_text_buffer(struct text_buffer **buffer);
+void print_to_text_buffer(struct text_buffer *buffer, const char *msg, ...);
+int free_text_buffer(struct text_buffer *buffer);
+
 int initialize_configuration(struct configuration_params **config,
                              char *config_file);
 
@@ -47,6 +58,7 @@ int create_file_path(char **file_path, const char *path, const char *filename);
 
 void log_configuration(struct configuration_params *config);
 void log_basic(int loglevel, const char *msg, ...);
+void log_basic_timestamp(int loglevel, const char *msg, ...);
 void log_verbose(int loglevel, const char *msg, ...);
 
 double mean(double *list, int n);

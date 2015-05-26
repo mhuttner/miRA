@@ -7,6 +7,65 @@
 #include <stdarg.h>
 #include <math.h>
 #include <stddef.h>
+#include <time.h>
+#include <string.h>
+
+int create_text_buffer(struct text_buffer **buffer) {
+  const size_t INITIAL_SIZE = 4096;
+  struct text_buffer *tmp_buffer =
+      (struct text_buffer *)malloc(sizeof(struct text_buffer));
+  if (tmp_buffer == NULL) {
+    return E_MALLOC_FAIL;
+  }
+  tmp_buffer->capacity = INITIAL_SIZE;
+  tmp_buffer->data = (char *)malloc(tmp_buffer->capacity * sizeof(char));
+  if (tmp_buffer->data == NULL) {
+    free(tmp_buffer);
+    return E_MALLOC_FAIL;
+  }
+  tmp_buffer->free_space = tmp_buffer->capacity;
+  tmp_buffer->start = tmp_buffer->data;
+
+  *buffer = tmp_buffer;
+  return E_SUCCESS;
+}
+void print_to_text_buffer(struct text_buffer *buffer, const char *msg, ...) {
+  if (buffer == NULL) {
+    return;
+  }
+  if (buffer->free_space <= 0) {
+    return;
+  }
+  int n;
+  va_list fmtargs;
+  va_start(fmtargs, msg);
+  n = vsnprintf(buffer->data, buffer->free_space, msg, fmtargs);
+  if (n > 0) {
+    if (buffer->free_space < n) {
+      buffer->capacity *= 2;
+      char *tmp_buffer =
+          (char *)realloc(buffer->start, buffer->capacity * sizeof(char));
+      if (tmp_buffer == NULL) {
+        buffer->free_space = 0;
+      } else {
+        buffer->free_space += buffer->capacity;
+        long offset = buffer->data - buffer->start;
+        buffer->start = tmp_buffer;
+        buffer->data = buffer->start + offset;
+      }
+    } else {
+      buffer->data += n;
+      buffer->free_space -= n;
+    }
+  }
+  va_end(fmtargs);
+}
+int free_text_buffer(struct text_buffer *buffer) {
+  free(buffer->start);
+  buffer->data = NULL;
+  free(buffer);
+  return E_SUCCESS;
+}
 
 static void set_default_config(struct configuration_params *config) {
   config->log_level = LOG_LEVEL_BASIC;
@@ -37,19 +96,92 @@ static void set_default_config(struct configuration_params *config) {
   config->cleanup_auxiliary_files = 1;
 }
 
+static void set_algae_config(struct configuration_params *config) {
+  config->log_level = LOG_LEVEL_BASIC;
+  config->openmp_thread_count = 10;
+
+  config->cluster_gap_size = 10;
+  config->cluster_min_reads = 10;
+  config->cluster_flank_size = 200;
+  config->cluster_max_length = 2000;
+
+  config->max_precursor_length = 0;
+  config->min_precursor_length = 0;
+  config->max_mfe_per_nt = -0.3;
+  config->max_hairpin_count = 4;
+  config->min_double_strand_length = 18;
+  config->permutation_count = 100;
+  config->max_pvalue = 0.01;
+
+  config->min_coverage = 0.01;
+  config->min_paired_fraction = 0.55;
+  config->min_duplex_length = 18;
+  config->max_duplex_length = 30;
+  config->allow_three_mismatches = 1;
+  config->allow_two_terminal_mismatches = 0;
+}
+static void set_plant_config(struct configuration_params *config) {
+  config->log_level = LOG_LEVEL_BASIC;
+  config->openmp_thread_count = 10;
+
+  config->cluster_gap_size = 10;
+  config->cluster_min_reads = 10;
+  config->cluster_flank_size = 200;
+  config->cluster_max_length = 2000;
+
+  config->max_precursor_length = 0;
+  config->min_precursor_length = 0;
+  config->max_mfe_per_nt = -0.2;
+  config->max_hairpin_count = 4;
+  config->min_double_strand_length = 18;
+  config->permutation_count = 100;
+  config->max_pvalue = 0.01;
+
+  config->min_coverage = 0.01;
+  config->min_paired_fraction = 0.55;
+  config->min_duplex_length = 18;
+  config->max_duplex_length = 30;
+  config->allow_three_mismatches = 1;
+  config->allow_two_terminal_mismatches = 0;
+}
+static void set_animal_config(struct configuration_params *config) {
+  config->log_level = LOG_LEVEL_BASIC;
+  config->openmp_thread_count = 10;
+
+  config->cluster_gap_size = 10;
+  config->cluster_min_reads = 10;
+  config->cluster_flank_size = 200;
+  config->cluster_max_length = 2000;
+
+  config->max_precursor_length = 200;
+  config->min_precursor_length = 0;
+  config->max_mfe_per_nt = -0.2;
+  config->max_hairpin_count = 2;
+  config->min_double_strand_length = 17;
+  config->permutation_count = 100;
+  config->max_pvalue = 0.01;
+
+  config->min_coverage = 0.01;
+  config->min_paired_fraction = 0.50;
+  config->min_duplex_length = 18;
+  config->max_duplex_length = 30;
+  config->allow_three_mismatches = 1;
+  config->allow_two_terminal_mismatches = 0;
+}
+
 static int parse_config_file(struct configuration_params *config,
                              char *config_file) {
   const int MAXLINELENGTH = 1024;
   const char *integer_tokens[] = {
       "log_level",                     "openmp_thread_count",
       "cluster_gap_size",              "cluster_min_reads",
-      "cluster_flank_size",           "cluster_max_length",
+      "cluster_flank_size",            "cluster_max_length",
       "max_precursor_length",          "min_precursor_length",
       "max_hairpin_count",             "min_double_strand_length",
       "permutation_count",             "min_duplex_length",
-      "max_duplex_length",      "allow_three_mismatches",
+      "max_duplex_length",             "allow_three_mismatches",
       "allow_two_terminal_mismatches", "create_coverage_plots",
-      "create_structure_plots",       "create_structure_coverage_plots",
+      "create_structure_plots",        "create_structure_coverage_plots",
       "cleanup_auxiliary_files"};
   int integer_token_offsets[] = {
       (int)offsetof(struct configuration_params, log_level),
@@ -69,7 +201,8 @@ static int parse_config_file(struct configuration_params *config,
       (int)offsetof(struct configuration_params, allow_two_terminal_mismatches),
       (int)offsetof(struct configuration_params, create_coverage_plots),
       (int)offsetof(struct configuration_params, create_structure_plots),
-      (int)offsetof(struct configuration_params, create_structure_coverage_plots),
+      (int)offsetof(struct configuration_params,
+                    create_structure_coverage_plots),
       (int)offsetof(struct configuration_params, cleanup_auxiliary_files)};
   const int integer_token_count = 19;
   const char *double_tokens[] = {"max_mfe_per_nt", "max_pvalue", "min_coverage",
@@ -152,6 +285,21 @@ int initialize_configuration(struct configuration_params **config,
   }
   set_default_config(tmp_config);
   if (config_file != NULL) {
+    if (strncasecmp(config_file, "animal", 7) == 0) {
+      set_animal_config(tmp_config);
+      *config = tmp_config;
+      return E_SUCCESS;
+    }
+    if (strncasecmp(config_file, "plant", 6) == 0) {
+      set_plant_config(tmp_config);
+      *config = tmp_config;
+      return E_SUCCESS;
+    }
+    if (strncasecmp(config_file, "algae", 6) == 0) {
+      set_algae_config(tmp_config);
+      *config = tmp_config;
+      return E_SUCCESS;
+    }
     parse_config_file(tmp_config, config_file);
   }
   *config = tmp_config;
@@ -204,6 +352,7 @@ int create_file_path(char **file_path, const char *path, const char *filename) {
 }
 
 void log_configuration(struct configuration_params *config) {
+  printf("log lev %d\n", config->log_level);
   log_basic(config->log_level, "Configuartion Parameters:\n");
   log_basic(config->log_level, "    log_level %d\n", config->log_level);
   log_basic(config->log_level, "    openmp_thread_count %d\n",
@@ -261,6 +410,26 @@ void log_basic(int loglevel, const char *msg, ...) {
   va_end(fmtargs);
   fflush(stdout);
 }
+void log_basic_timestamp(int loglevel, const char *msg, ...) {
+  if (loglevel < LOG_LEVEL_BASIC) {
+    return;
+  }
+  time_t ltime;
+  struct tm result;
+  char stime[32];
+  ltime = time(NULL);
+  localtime_r(&ltime, &result);
+  asctime_r(&result, stime);
+  /* remove newline */
+  stime[strlen(stime) - 1] = '\0';
+  printf("%s --- ", stime);
+
+  va_list fmtargs;
+  va_start(fmtargs, msg);
+  vprintf(msg, fmtargs);
+  va_end(fmtargs);
+  fflush(stdout);
+}
 
 void log_verbose(int loglevel, const char *msg, ...) {
   if (loglevel < LOG_LEVEL_VERBOSE) {
@@ -272,6 +441,8 @@ void log_verbose(int loglevel, const char *msg, ...) {
   va_end(fmtargs);
   fflush(stdout);
 }
+
+void log_to_file(struct configuration_params *config, const char *msg, ...) {}
 
 double mean(double *list, int n) {
   double sum = 0.0;
