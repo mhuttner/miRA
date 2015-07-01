@@ -1,8 +1,10 @@
-#include <stddef.h>
-#include "defs.h"
+
 
 #ifndef PARSE_SAM_H
 #define PARSE_SAM_H
+
+#include <stddef.h>
+#include "defs.h"
 
 struct sq_header {
   char *sn;

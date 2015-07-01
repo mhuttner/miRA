@@ -48,7 +48,13 @@ int report_valid_candiates(struct extended_candidate_list *ec_list,
   struct chrom_coverage *chrom_cov = NULL;
   for (size_t i = 0; i < ec_list->n; i++) {
 
+    // temporary
     ecand = ec_list->candidates[i];
+    if (ecand->possible_micro_rnas->n == 0) {
+      continue;
+    }
+    ecand->mature_micro_rna = ecand->possible_micro_rnas->mature_sequences[0];
+    ecand->star_micro_rna = ecand->mature_micro_rna->matching_sequence;
     if (ecand->is_valid != 1) {
       continue;
     }
@@ -151,7 +157,8 @@ int create_candidate_report(
                       ecand->cand->id);
 #ifdef HAVE_GNUPLOT
   if (config->create_coverage_plots) {
-
+    log_verbose_timestamp(config->log_level,
+                          "\t\tGenerating coverage plot...\n");
     err = create_coverage_plot(&cov_plot_file, ecand, chrom_cov,
                                cov_plot_ouput_path);
     if (err != E_SUCCESS) {
@@ -161,6 +168,8 @@ int create_candidate_report(
 #endif /* HAVE_GNUPLOT */
 #ifdef HAVE_JAVA
   if (config->create_structure_plots) {
+    log_verbose_timestamp(config->log_level,
+                          "\t\tGenerating structure image...\n");
     err = create_structure_image(&structure_file, ecand, executable_path,
                                  structure_output_path);
     if (err != E_SUCCESS) {
@@ -171,6 +180,8 @@ int create_candidate_report(
 
 #ifdef HAVE_JAVA
   if (config->create_structure_coverage_plots) {
+    log_verbose_timestamp(config->log_level,
+                          "\t\tGenerating coverage image...\n");
     err = create_coverage_image(&coverage_file, ecand, executable_path,
                                 chrom_cov, coverage_output_path);
     if (err != E_SUCCESS) {
@@ -178,6 +189,8 @@ int create_candidate_report(
     }
   }
 #endif /* HAVE_JAVA */
+  log_verbose_timestamp(config->log_level,
+                        "\t\tGenerating latex_template...\n");
   err =
       create_latex_template(&tex_file, ecand, chrom_cov, cov_plot_file,
                             structure_file, coverage_file, report_output_path);
@@ -188,6 +201,7 @@ int create_candidate_report(
   }
 
 #ifdef HAVE_LATEX
+  log_verbose_timestamp(config->log_level, "\t\tCompiling report...\n");
   err = compile_tex_file(tex_file, report_output_path);
   if (err != E_SUCCESS) {
     cleanup_auxiliary_files(cov_plot_file, structure_file, coverage_file,
@@ -431,8 +445,8 @@ int create_latex_template(char **tex_file, struct extended_candidate *ecand,
   struct micro_rna_candidate *cand = ecand->cand;
   struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
   struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
-  struct unique_read_list *mature_reads = ecand->mature_reads;
-  struct unique_read_list *star_reads = ecand->star_reads;
+  struct unique_read_list *mature_reads = ecand->mature_micro_rna->reads;
+  struct unique_read_list *star_reads = ecand->star_micro_rna->reads;
 
   char file_name[265];
   sprintf(file_name, "Cluster_%lld_report.tex", cand->id);
@@ -644,8 +658,8 @@ int write_bed_lines(FILE *fp, struct extended_candidate *ecand) {
   struct micro_rna_candidate *cand = ecand->cand;
   struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
   struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
-  struct unique_read_list *mature_reads = ecand->mature_reads;
-  struct unique_read_list *star_reads = ecand->star_reads;
+  struct unique_read_list *mature_reads = ecand->mature_micro_rna->reads;
+  struct unique_read_list *star_reads = ecand->star_micro_rna->reads;
 
   u32 mature_read_count = 0;
   for (size_t i = 0; i < mature_reads->n; i++) {
@@ -680,8 +694,8 @@ int write_gtf_line(FILE *fp, struct extended_candidate *ecand) {
     return E_FILE_WRITING_FAILED;
   }
   struct micro_rna_candidate *cand = ecand->cand;
-  struct unique_read_list *mature_reads = ecand->mature_reads;
-  struct unique_read_list *star_reads = ecand->star_reads;
+  struct unique_read_list *mature_reads = ecand->mature_micro_rna->reads;
+  struct unique_read_list *star_reads = ecand->star_micro_rna->reads;
 
   u32 mature_read_count = 0;
   for (size_t i = 0; i < mature_reads->n; i++) {

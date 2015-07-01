@@ -1,10 +1,12 @@
+
+#ifndef VFOLD_H
+#define VFOLD_H
+
 #include <stdio.h>
 #include "cluster.h"
 #include "Lfold/Lfold.h"
 #include "fasta.h"
 #include "util.h"
-#ifndef VFOLD_H
-#define VFOLD_H
 
 struct structure_info {
   char *structure_string;

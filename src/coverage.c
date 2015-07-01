@@ -9,8 +9,10 @@
 #include "candidates.h"
 #include "uthash.h"
 #include "defs.h"
-#include "structure_evaluation.h"
 #include "reporting.h"
+#include "reads.h"
+#include "structure_evaluation.h"
+#include "mirna_validation.h"
 
 static int print_help();
 
@@ -75,7 +77,6 @@ int coverage_main(struct configuration_params *config, char *executable_file,
       break;
     }
   }
-
   err = read_candidate_file(&c_list, mira_file);
   if (err) {
     goto error;
@@ -188,16 +189,13 @@ int coverage_test_candidates(struct extended_candidate_list *cand_list,
     if (chrom_cov == NULL) {
       return E_CHROMOSOME_NOT_FOUND;
     }
-    err = find_mature_micro_rna(ecand, chrom_cov, config);
-    if (err != E_SUCCESS || ecand->mature_micro_rna == NULL) {
+    err = find_mature_micro_rnas(ecand, chrom_cov, config);
+    if (err != E_SUCCESS) {
       continue;
     }
-    validate_mature_micro_rna(ecand, config);
-    if (ecand->mature_micro_rna->is_valid == 0) {
-      continue;
-    }
-    err = find_star_micro_rna(ecand, chrom_cov, config);
-    if (err != E_SUCCESS || ecand->star_micro_rna == NULL) {
+    validate_mature_micro_rnas(ecand, config);
+    err = filter_mature_micro_rnas(ecand, chrom_cov, config);
+    if (err != E_SUCCESS) {
       continue;
     }
     err = count_unique_reads(ecand, sam);
@@ -209,9 +207,9 @@ int coverage_test_candidates(struct extended_candidate_list *cand_list,
   return E_SUCCESS;
 }
 
-int find_mature_micro_rna(struct extended_candidate *ecand,
-                          struct chrom_coverage *chrom_cov,
-                          struct configuration_params *config) {
+int find_mature_micro_rnas(struct extended_candidate *ecand,
+                           struct chrom_coverage *chrom_cov,
+                           struct configuration_params *config) {
   u32 *cov_list = chrom_cov->coverage_plus;
   struct micro_rna_candidate *cand = ecand->cand;
   if (cand->strand == '-') {
@@ -223,37 +221,33 @@ int find_mature_micro_rna(struct extended_candidate *ecand,
   size_t neg_spike_count = 0;
   size_t pos_spike_count = 0;
   u64 total_coverage = 0;
-  u64 best_start = 0;
-  u64 best_end = 0;
-  u64 best_coverage = 0;
-  double best_paired_fraction = 0.0;
+
   struct candidate_subsequence *mature_micro_rna = NULL;
 
   get_coverage_in_range(&total_coverage, cov_list, cand->start, cand->end);
   int err = 0;
+
+  err = create_candidate_subseqence_list(&(ecand->possible_micro_rnas));
   u64 *pos_cov_spikes = (u64 *)malloc(n * sizeof(u64));
   u64 *neg_cov_spikes = (u64 *)malloc(n * sizeof(u64));
-  if (pos_cov_spikes == NULL || neg_cov_spikes == NULL) {
+  if (pos_cov_spikes == NULL || neg_cov_spikes == NULL || err) {
     err = E_MALLOC_FAIL;
     goto error;
   }
 
   for (size_t i = 0; i < (n - 1); i++) {
     u64 global_index = cand->start + i;
-    double cov_local = (double)cov_list[global_index];
-    double cov_next = (double)cov_list[global_index + 1];
-    if (cov_next - cov_local > 10e-6) {
+    u32 cov_local = cov_list[global_index];
+    u32 cov_next = cov_list[global_index + 1];
+    if (cov_next > cov_local) {
       pos_cov_spikes[pos_spike_count] = i;
       pos_spike_count++;
     }
-    if (cov_local - cov_next > 10e-6) {
+    if (cov_local > cov_next) {
       neg_cov_spikes[neg_spike_count] = i;
       neg_spike_count++;
     }
   }
-  printf("pos spikes: %ld\n", pos_spike_count);
-  printf("neg spikes: %ld\n", neg_spike_count);
-  printf("Iterations: %ld\n", pos_spike_count * neg_spike_count);
 
   for (size_t i = 0; i < pos_spike_count; i++) {
     for (size_t j = 0; j < neg_spike_count; j++) {
@@ -278,11 +272,15 @@ int find_mature_micro_rna(struct extended_candidate *ecand,
       u64 segment_coverage = 0;
       get_coverage_in_range(&segment_coverage, cov_list, cand->start + start,
                             cand->start + end);
-      if (segment_coverage > best_coverage) {
-        best_coverage = segment_coverage;
-        best_start = start;
-        best_end = end;
-        best_paired_fraction = paired_fraction;
+      err = create_candidate_subseqence(&mature_micro_rna, start, end,
+                                        segment_coverage, paired_fraction);
+      if (err) {
+        goto error;
+      }
+      err = append_candidate_subseqence_list(ecand->possible_micro_rnas,
+                                             mature_micro_rna);
+      if (err) {
+        goto error;
       }
     }
   }
@@ -290,18 +288,11 @@ int find_mature_micro_rna(struct extended_candidate *ecand,
   free(neg_cov_spikes);
   pos_cov_spikes = NULL;
   neg_cov_spikes = NULL;
-  if (best_coverage == 0) {
-    err = E_NO_MATURE_MI_RNA_FOUND;
-    goto error;
-  }
-  err = create_candidate_subseqence(&mature_micro_rna, best_start, best_end,
-                                    best_coverage, best_paired_fraction);
-  if (err != E_SUCCESS) {
-    goto error;
-  }
-  ecand->mature_micro_rna = mature_micro_rna;
   return E_SUCCESS;
 error:
+  if (ecand->possible_micro_rnas != NULL) {
+    free_candidate_subsequence_list(ecand->possible_micro_rnas);
+  }
   if (pos_cov_spikes != NULL) {
     free(pos_cov_spikes);
   }
@@ -309,107 +300,6 @@ error:
     free(pos_cov_spikes);
   }
   return err;
-}
-
-int find_star_micro_rna(struct extended_candidate *ecand,
-                        struct chrom_coverage *chrom_cov,
-                        struct configuration_params *config) {
-  const char MISMATCH_CHAR = '.';
-  const int DICER_OFFSET = 2;
-
-  struct micro_rna_candidate *cand = ecand->cand;
-  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
-
-  u32 bracket_start = mature_mirna->start;
-  while (cand->structure[bracket_start] == MISMATCH_CHAR) {
-    bracket_start++;
-    if (bracket_start > mature_mirna->end) {
-      /* should never happen */
-      return E_UNKNOWN;
-    }
-  }
-  u32 bracket_end = mature_mirna->end - 1;
-  while (cand->structure[bracket_end] == MISMATCH_CHAR) {
-    bracket_end--;
-    if (bracket_end < mature_mirna->start) {
-      /* should never happen */
-      return E_UNKNOWN;
-    }
-  }
-  u32 star_start = 0;
-  u32 star_end = 0;
-  size_t n = cand->end - cand->start;
-  find_matching_bracket_index(&star_end, bracket_start, cand->structure, n);
-  find_matching_bracket_index(&star_start, bracket_end, cand->structure, n);
-
-  star_start += DICER_OFFSET;
-  star_end += DICER_OFFSET + 1;
-  if (star_end > n) {
-    star_end = n;
-  }
-  size_t l = star_end - star_start;
-  if (l < config->min_duplex_length || l >= config->max_duplex_length) {
-    return E_NO_STAR_MI_RNA_FOUND;
-  }
-
-  u32 *cov_list = chrom_cov->coverage_plus;
-  if (cand->strand == '-') {
-    cov_list = chrom_cov->coverage_minus;
-  }
-
-  u64 coverage = 0;
-  get_coverage_in_range(&coverage, cov_list, star_start + cand->start,
-                        star_end + cand->start);
-
-  struct candidate_subsequence *star_micro_rna = NULL;
-  create_candidate_subseqence(&star_micro_rna, star_start, star_end, coverage,
-                              -1.0);
-  ecand->star_micro_rna = star_micro_rna;
-
-  return E_SUCCESS;
-}
-
-int find_matching_bracket_index(u32 *result, u32 target, char *structure,
-                                size_t n) {
-  const char OPENING_BRACKET = '(';
-  const char CLOSING_BRACKET = ')';
-  int dir = 0;
-  char initial_bracket;
-  char inverse_bracket;
-  if (structure[target] == OPENING_BRACKET) {
-    initial_bracket = OPENING_BRACKET;
-    inverse_bracket = CLOSING_BRACKET;
-    dir = 1;
-  }
-  if (structure[target] == CLOSING_BRACKET) {
-    initial_bracket = CLOSING_BRACKET;
-    inverse_bracket = OPENING_BRACKET;
-    dir = -1;
-  }
-  if (dir == 0) {
-    return E_STRUCTURE_IS_INVALID;
-  }
-  u32 open_count = 0;
-  u32 matching_index = 0;
-  for (i64 i = target; i < n && i >= 0; i += dir) {
-    char c = structure[i];
-    if (c == initial_bracket) {
-      open_count++;
-    }
-    if (c == inverse_bracket) {
-      open_count--;
-      if (open_count == 0) {
-        matching_index = i;
-        break;
-      }
-    }
-  }
-  if (open_count > 0) {
-    return E_STRUCTURE_IS_INVALID;
-  }
-  *result = matching_index;
-
-  return E_SUCCESS;
 }
 
 int get_coverage_in_range(u64 *result, u32 *cov_list, u64 start, u64 end) {
@@ -459,234 +349,6 @@ int extend_all_candidates(struct extended_candidate_list **ecand_list,
   return E_SUCCESS;
 }
 
-int validate_mature_micro_rna(struct extended_candidate *ecand,
-                              struct configuration_params *config) {
-  determine_mature_arm(ecand);
-  check_for_valid_folding(ecand);
-  if (config->allow_two_terminal_mismatches == 0) {
-    check_for_terminal_mismatches(ecand);
-  }
-  if (config->allow_three_mismatches == 0) {
-    check_for_adjacent_mismatches(ecand);
-  }
-
-  return E_SUCCESS;
-}
-int determine_mature_arm(struct extended_candidate *ecand) {
-  struct micro_rna_candidate *cand = ecand->cand;
-  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
-
-  u32 cand_center = (cand->end - cand->start + 1) / 2;
-  u32 mature_center = (mature_mirna->end + mature_mirna->start + 1) / 2;
-  if (mature_center > cand_center) {
-    if (cand->strand == '+') {
-      mature_mirna->arm = THREE_PRIME;
-    } else {
-      mature_mirna->arm = FIVE_PRIME;
-    }
-  } else {
-    if (cand->strand == '+') {
-      mature_mirna->arm = FIVE_PRIME;
-    } else {
-      mature_mirna->arm = THREE_PRIME;
-    }
-  }
-
-  return E_SUCCESS;
-}
-
-int check_for_valid_folding(struct extended_candidate *ecand) {
-  struct micro_rna_candidate *cand = ecand->cand;
-  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
-  if (mature_mirna == NULL) {
-    return E_NO_MATURE_MI_RNA;
-  }
-  int loop_count = 0;
-  get_loop_count_for_substructure(&loop_count, cand->structure,
-                                  mature_mirna->start, mature_mirna->end);
-  if (loop_count > 0) {
-    mature_mirna->is_valid = 0;
-  }
-  return E_SUCCESS;
-}
-int check_for_terminal_mismatches(struct extended_candidate *ecand) {
-  const char MISMATCH_CHAR = '.';
-  struct micro_rna_candidate *cand = ecand->cand;
-  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
-  if (cand->structure[mature_mirna->start] == MISMATCH_CHAR &&
-      cand->structure[mature_mirna->start + 1] == MISMATCH_CHAR) {
-    mature_mirna->is_valid = 0;
-  }
-  if (cand->structure[mature_mirna->end - 2] == MISMATCH_CHAR &&
-      cand->structure[mature_mirna->end - 1] == MISMATCH_CHAR) {
-    mature_mirna->is_valid = 0;
-  }
-  return E_SUCCESS;
-}
-int check_for_adjacent_mismatches(struct extended_candidate *ecand) {
-  struct micro_rna_candidate *cand = ecand->cand;
-  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
-  const char MISMATCH_CHAR = '.';
-  int mismatch_count = 0;
-  for (size_t i = mature_mirna->start; i < mature_mirna->end; i++) {
-    if (cand->structure[i] == MISMATCH_CHAR) {
-      mismatch_count++;
-      if (mismatch_count >= 4) {
-        mature_mirna->is_valid = 0;
-        break;
-      }
-    } else {
-      mismatch_count = 0;
-    }
-  }
-  return E_SUCCESS;
-}
-
-int count_unique_reads(struct extended_candidate *ecand, struct sam_file *sam) {
-  const int READCOUNT_FLANK = 30;
-  struct micro_rna_candidate *cand = ecand->cand;
-  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
-  struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
-  struct sam_entry *entry = NULL;
-
-  struct unique_read_list *mature_reads = NULL;
-  struct unique_read_list *star_reads = NULL;
-  create_unique_read_list(&mature_reads);
-  create_unique_read_list(&star_reads);
-  char strand;
-
-  size_t global_mature_start =
-      cand->start + mature_mirna->start - READCOUNT_FLANK;
-  size_t global_mature_end = cand->start + mature_mirna->end + READCOUNT_FLANK;
-  size_t global_star_start = cand->start + star_mirna->start - READCOUNT_FLANK;
-  size_t global_star_end = cand->start + star_mirna->end + READCOUNT_FLANK;
-
-  ecand->total_reads = 0;
-
-  for (size_t i = 0; i < sam->n; i++) {
-    entry = sam->entries[i];
-    long entry_start = entry->pos - 1;
-    strand = (entry->flag & REV_COMPLM) ? '-' : '+';
-    if (strand != cand->strand) {
-      continue;
-    }
-    if (strcmp(entry->rname, cand->chrom) != 0) {
-      continue;
-    }
-    if (entry_start >= global_mature_start) {
-      u64 end = entry_start + strlen(entry->seq);
-      if (end <= global_mature_end) {
-        if (strand == '-') {
-          char *reversed = NULL;
-          reverse_complement_sequence_string(&reversed, entry->seq,
-                                             strlen(entry->seq) + 1);
-          free(entry->seq);
-          entry->seq = reversed;
-        }
-        add_read_to_unique_read_list(mature_reads, entry_start, entry->seq);
-      }
-    }
-    if (entry_start >= global_star_start) {
-      u64 end = entry_start + strlen(entry->seq);
-      if (end <= global_star_end) {
-        if (strand == '-') {
-          char *reversed = NULL;
-          reverse_complement_sequence_string(&reversed, entry->seq,
-                                             strlen(entry->seq) + 1);
-          free(entry->seq);
-          entry->seq = reversed;
-        }
-        add_read_to_unique_read_list(star_reads, entry_start, entry->seq);
-      }
-    }
-    if (entry_start >= cand->start) {
-      u64 end = entry_start + strlen(entry->seq);
-      if (end <= cand->end) {
-        ecand->total_reads++;
-      }
-    }
-  }
-  ecand->total_read_percent = (double)ecand->total_reads / sam->n;
-  ecand->star_reads = star_reads;
-  ecand->mature_reads = mature_reads;
-  return E_SUCCESS;
-}
-
-int create_unique_read(struct unique_read **read, u64 start, const char *seq) {
-  struct unique_read *read_tmp =
-      (struct unique_read *)malloc(sizeof(struct unique_read));
-  if (read_tmp == NULL) {
-    return E_MALLOC_FAIL;
-  }
-  read_tmp->start = start;
-  size_t l = strlen(seq);
-  read_tmp->seq = (char *)malloc((l + 1) * sizeof(char));
-  if (read_tmp->seq == NULL) {
-    free(read_tmp);
-    return E_MALLOC_FAIL;
-  }
-  memcpy(read_tmp->seq, seq, l);
-  read_tmp->seq[l] = 0;
-  read_tmp->end = start + l;
-  read_tmp->count = 1;
-  *read = read_tmp;
-  return E_SUCCESS;
-}
-int create_unique_read_list(struct unique_read_list **ur_list) {
-  const int INITIAL_CAPACITY = 16;
-  struct unique_read_list *ur_list_tmp =
-      (struct unique_read_list *)malloc(sizeof(struct unique_read_list));
-  if (ur_list_tmp == NULL) {
-    return E_MALLOC_FAIL;
-  }
-  ur_list_tmp->capacity = INITIAL_CAPACITY;
-  ur_list_tmp->reads = (struct unique_read **)malloc(
-      ur_list_tmp->capacity * sizeof(struct unique_read *));
-  if (ur_list_tmp->reads == NULL) {
-    free(ur_list_tmp);
-    return E_MALLOC_FAIL;
-  }
-  ur_list_tmp->n = 0;
-  *ur_list = ur_list_tmp;
-  return E_SUCCESS;
-}
-int append_unique_read_list(struct unique_read_list *ur_list,
-                            struct unique_read *read) {
-  if (ur_list->n >= ur_list->capacity) {
-    ur_list->capacity *= 2;
-    struct unique_read **tmp = (struct unique_read **)realloc(
-        ur_list->reads, ur_list->capacity * sizeof(struct unique_read *));
-    if (tmp == NULL) {
-      return E_REALLOC_FAIL;
-    }
-    ur_list->reads = tmp;
-  }
-  ur_list->reads[ur_list->n] = read;
-  ur_list->n++;
-  return E_SUCCESS;
-}
-int add_read_to_unique_read_list(struct unique_read_list *ur_list, u64 start,
-                                 const char *seq) {
-  struct unique_read *read = NULL;
-  for (size_t i = 0; i < ur_list->n; i++) {
-    read = ur_list->reads[i];
-    if (start == read->start && strcmp(seq, read->seq) == 0) {
-      read->count++;
-      return E_SUCCESS;
-    }
-  }
-  int err;
-  err = create_unique_read(&read, start, seq);
-  if (err != E_SUCCESS) {
-    return err;
-  }
-  err = append_unique_read_list(ur_list, read);
-  if (err != E_SUCCESS) {
-    return err;
-  }
-  return E_SUCCESS;
-}
-
 int create_extended_candidate(struct extended_candidate **ecand,
                               struct micro_rna_candidate *cand) {
   struct extended_candidate *ecand_tmp =
@@ -695,11 +357,56 @@ int create_extended_candidate(struct extended_candidate **ecand,
     return E_MALLOC_FAIL;
   }
   ecand_tmp->cand = cand;
-  ecand_tmp->mature_micro_rna = NULL;
-  ecand_tmp->star_micro_rna = NULL;
-  ecand_tmp->mature_reads = NULL;
-  ecand_tmp->star_reads = NULL;
+  ecand_tmp->possible_micro_rnas = NULL;
   *ecand = ecand_tmp;
+  return E_SUCCESS;
+}
+
+int
+create_candidate_subseqence_list(struct candidate_subsequence_list **css_list) {
+  const int INITIAL_CAPACITY = 32;
+  struct candidate_subsequence_list *tmp_list =
+      (struct candidate_subsequence_list *)malloc(
+          sizeof(struct candidate_subsequence_list));
+  if (tmp_list == NULL) {
+    return E_MALLOC_FAIL;
+  }
+  tmp_list->capacity = INITIAL_CAPACITY;
+  tmp_list->n = 0;
+  tmp_list->mature_sequences = (struct candidate_subsequence **)malloc(
+      tmp_list->capacity * sizeof(struct candidate_subsequence *));
+  if (tmp_list->mature_sequences == NULL) {
+    free(tmp_list);
+    return E_MALLOC_FAIL;
+  }
+  *css_list = tmp_list;
+  return E_SUCCESS;
+}
+int
+append_candidate_subseqence_list(struct candidate_subsequence_list *css_list,
+                                 struct candidate_subsequence *mature) {
+  if (css_list->n >= css_list->capacity) {
+    css_list->capacity *= 2;
+    struct candidate_subsequence **tmp =
+        (struct candidate_subsequence **)realloc(
+            css_list->mature_sequences,
+            css_list->capacity * sizeof(struct candidate_subsequence *));
+    if (tmp == NULL) {
+      return E_REALLOC_FAIL;
+    }
+    css_list->mature_sequences = tmp;
+  }
+  css_list->mature_sequences[css_list->n] = mature;
+  css_list->n++;
+  return E_SUCCESS;
+}
+int
+free_candidate_subsequence_list(struct candidate_subsequence_list *css_list) {
+  for (size_t i = 0; i < css_list->n; i++) {
+    free_candidate_subsequence(css_list->mature_sequences[i]);
+  }
+  free(css_list->mature_sequences);
+  free(css_list);
   return E_SUCCESS;
 }
 
@@ -715,6 +422,9 @@ int create_candidate_subseqence(struct candidate_subsequence **cs, u32 start,
   cs_tmp->coverage = coverage;
   cs_tmp->paired_fraction = paired_fraction;
   cs_tmp->is_valid = 1;
+  cs_tmp->is_star = 0;
+  cs_tmp->is_artificial = 0;
+  cs_tmp->reads = NULL;
   *cs = cs_tmp;
   return E_SUCCESS;
 }
@@ -729,31 +439,15 @@ int free_extended_candidate_list(struct extended_candidate_list *ecand_list) {
 
 int free_extended_candidate(struct extended_candidate *ecand) {
   free_micro_rna_candidate(ecand->cand);
-  free_candidate_subsequence(ecand->mature_micro_rna);
-  free_candidate_subsequence(ecand->star_micro_rna);
-  free_unique_read_list(ecand->mature_reads);
-  free_unique_read_list(ecand->star_reads);
+  free_candidate_subsequence_list(ecand->possible_micro_rnas);
   free(ecand);
-  return E_SUCCESS;
-}
-int free_unique_read_list(struct unique_read_list *ur_list) {
-  if (ur_list == NULL) {
-    return E_SUCCESS;
-  }
-  for (size_t i = 0; i < ur_list->n; i++) {
-    free_unique_read(ur_list->reads[i]);
-  }
-  free(ur_list->reads);
-  free(ur_list);
-  return E_SUCCESS;
-}
-int free_unique_read(struct unique_read *read) {
-  free(read->seq);
-  free(read);
   return E_SUCCESS;
 }
 
 int free_candidate_subsequence(struct candidate_subsequence *cs) {
+  if (cs->reads != NULL) {
+    free_unique_read_list(cs->reads);
+  }
   if (cs != NULL) {
     free(cs);
   }

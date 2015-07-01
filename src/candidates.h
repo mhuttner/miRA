@@ -1,9 +1,11 @@
-#include <stddef.h>
-#include "defs.h"
-#include "vfold.h"
+
 
 #ifndef CANDIDATES_H
 #define CANDIDATES_H
+
+#include <stddef.h>
+#include "defs.h"
+#include "vfold.h"
 
 struct micro_rna_candidate {
   u64 id;
