@@ -26,7 +26,16 @@ int mirna_coverage_compare(const void *a, const void *b) {
 int mirna_total_coverage_compare(const void *a, const void *b) {
   struct candidate_subsequence *csa = *(struct candidate_subsequence **)a;
   struct candidate_subsequence *csb = *(struct candidate_subsequence **)b;
-  return ((i64)csb->coverage + (i64)csb->matching_sequence->coverage) -
+  i64 bias = 0;
+  const i64 BIAS_OFFSET = 10000;
+  if (csb->matching_sequence->is_artificial) {
+    bias -= BIAS_OFFSET;
+  }
+  if (csa->matching_sequence->is_artificial) {
+    bias += BIAS_OFFSET;
+  }
+
+  return bias + ((i64)csb->coverage + (i64)csb->matching_sequence->coverage) -
          ((i64)csa->coverage + (i64)csa->matching_sequence->coverage);
 }
 

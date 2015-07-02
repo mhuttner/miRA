@@ -468,10 +468,10 @@ int create_latex_template(char **tex_file, struct extended_candidate *ecand,
               "\\verb$%s$\\\\\n"
               "Precursor miRNA : start = \\verb$%lld$, stop = \\verb$%lld$, "
               "length = \\verb$%lld$\\\\\n"
-              "Mature miRNA : start = \\verb$%lld$ (\\verb$%d$), stop = "
+              "Best mature miRNA : start = \\verb$%lld$ (\\verb$%d$), stop = "
               "\\verb$%lld$ (\\verb$%d$), length = \\verb$%d$, arm = "
               "\\verb$%d'$\\\\\n"
-              "Star miRNA : start = \\verb$%lld$ (\\verb$%d$), stop = "
+              "Best star miRNA : start = \\verb$%lld$ (\\verb$%d$), stop = "
               "\\verb$%lld$ (\\verb$%d$), length = \\verb$%d$\\\\\n"
               "{[}Note: Positions are 1-based and inclusive{]}\\\\\n \\\\\n",
           cand->id, cand->chrom, cand->start, cand->end,
@@ -481,12 +481,12 @@ int create_latex_template(char **tex_file, struct extended_candidate *ecand,
           (int)mature_mirna->arm, cand->start + star_mirna->start,
           star_mirna->start, cand->start + star_mirna->end, star_mirna->end,
           star_mirna->end - star_mirna->start);
-  fprintf(fp, "Mature miRNA sequence: \\verb$");
+  fprintf(fp, "Best mature miRNA sequence: \\verb$");
   for (u32 i = mature_mirna->start; i < mature_mirna->end; i++) {
     fprintf(fp, "%c", cand->sequence[i]);
   }
   fprintf(fp, "$\\\\\n");
-  fprintf(fp, "Star miRNA sequence: \\verb$");
+  fprintf(fp, "Best star miRNA sequence: \\verb$");
   for (u32 i = star_mirna->start; i < star_mirna->end; i++) {
     fprintf(fp, "%c", cand->sequence[i]);
   }
@@ -503,13 +503,41 @@ int create_latex_template(char **tex_file, struct extended_candidate *ecand,
               "\\verb$%i$, length = \\verb$%i$\\\\\n"
               "Longest ds segment (2 MM): start = \\verb$%i$, stop = "
               "\\verb$%i$, length = \\verb$%i$\\\\\n"
-              "Total fraction of paired nucleotides = %5.4f\n",
+              "Total fraction of paired nucleotides = %5.4f\\\\\n",
           cand->mfe, cand->pvalue, cand->mean, cand->sd,
           cand->external_loop_count, cand->stem_start, cand->stem_end,
           cand->stem_end - cand->stem_start + 1, cand->stem_start_with_mismatch,
           cand->stem_end_with_mismatch,
           cand->stem_end_with_mismatch - cand->stem_start_with_mismatch + 1,
           cand->paired_fraction);
+
+  fprintf(fp, "All micro rna candidates: \\\\ \\vspace{0.5cm}\n "
+              "\\begin{tabular}{| c | c | c | c | c "
+              "|}\\hline \nSequence & Type & "
+              "Start & Stop & Passes Dicer check \\\\ \\hline\n");
+  struct candidate_subsequence_list *css_list = ecand->possible_micro_rnas;
+  struct candidate_subsequence *mature_tmp = NULL;
+  struct candidate_subsequence *star_tmp = NULL;
+  for (size_t i = 0; i < css_list->n; i++) {
+    mature_tmp = css_list->mature_sequences[i];
+    star_tmp = mature_tmp->matching_sequence;
+    fprintf(fp, "\\verb$");
+    for (u32 i = mature_tmp->start; i < mature_tmp->end; i++) {
+      fprintf(fp, "%c", cand->sequence[i]);
+    }
+    fprintf(fp, "$ & \\verb$mature$ & \\verb$%lld$ & \\verb$%lld$ & \\verb$%s$ "
+                "\\\\ \n",
+            cand->start + mature_tmp->start, cand->start + mature_tmp->end, "");
+    fprintf(fp, "\\verb$");
+    for (u32 i = star_tmp->end - 1; i >= star_tmp->start; i--) {
+      fprintf(fp, "%c", cand->sequence[i]);
+    }
+    fprintf(fp, "$ & \\verb$star$ & \\verb$%lld$ & \\verb$%lld$ & \\verb$%s$ "
+                "\\\\ \\hline\n",
+            cand->start + star_tmp->start, cand->start + star_tmp->end,
+            star_tmp->is_artificial ? "false" : "true");
+  }
+  fprintf(fp, "\\end{tabular}\\\\\n");
 
   u32 *cov_list = chrom_cov->coverage_plus;
   if (cand->strand == '-') {
@@ -656,37 +684,29 @@ int write_bed_lines(FILE *fp, struct extended_candidate *ecand) {
     return E_FILE_WRITING_FAILED;
   }
   struct micro_rna_candidate *cand = ecand->cand;
-  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
-  struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
-  struct unique_read_list *mature_reads = ecand->mature_micro_rna->reads;
-  struct unique_read_list *star_reads = ecand->star_micro_rna->reads;
-
-  u32 mature_read_count = 0;
-  for (size_t i = 0; i < mature_reads->n; i++) {
-    mature_read_count += mature_reads->reads[i]->count;
-  }
-  u32 star_read_count = 0;
-  for (size_t i = 0; i < star_reads->n; i++) {
-    star_read_count += star_reads->reads[i]->count;
-  }
-
-  fprintf(fp, "%s\t%llu\t%llu\tCluster_%lld_precursor\t%d\t%c\t%llu\t%llu\t%"
-              "d\t%d\t%d\t%7.5f\t%9.7e\t%7.5e\t%7.5e\n",
+  struct candidate_subsequence_list *css_list = ecand->possible_micro_rnas;
+  struct candidate_subsequence *mature_mirna = NULL;
+  struct candidate_subsequence *star_mirna = NULL;
+  fprintf(fp, "%s\t%llu\t%llu\tprecursor_%lld\t%d\t%c\t%llu\t%llu\t%d\t%d\n",
           cand->chrom, cand->start, cand->end, cand->id, 0, cand->strand,
-          cand->start, cand->end, 0, 0, 0, cand->mfe, cand->pvalue, cand->mean,
-          cand->sd);
-  fprintf(fp, "%s\t%llu\t%llu\tCluster_%lld_%s_[mature]\t%d\t%c\t%llu\t%llu\t%"
-              "d\t%d\t%d\n",
-          cand->chrom, cand->start, cand->end, cand->id,
-          (mature_mirna->arm == 5) ? "5p" : "3p", 0, cand->strand,
-          cand->start + mature_mirna->start, cand->start + mature_mirna->end, 0,
-          mature_read_count, 0);
-  fprintf(fp, "%s\t%llu\t%llu\tCluster_%lld_%s_[star]\t%d\t%c\t%llu\t%llu\t%"
-              "d\t%d\t%d\n",
-          cand->chrom, cand->start, cand->end, cand->id,
-          (mature_mirna->arm == 5) ? "3p" : "5p", 0, cand->strand,
-          cand->start + star_mirna->start, cand->start + star_mirna->end, 0,
-          star_read_count, 0);
+          cand->start, cand->end, 0, 0);
+  for (size_t i = 0; i < css_list->n; i++) {
+    mature_mirna = css_list->mature_sequences[i];
+    star_mirna = mature_mirna->matching_sequence;
+    u32 score = (star_mirna->is_artificial) ? 500 : 999;
+
+    fprintf(fp,
+            "%s\t%llu\t%llu\tprecursor_%lld_mir_%ld_%s\t%d\t%c\t%llu\t%llu\n",
+            cand->chrom, cand->start, cand->end, cand->id, i,
+            (mature_mirna->arm == 5) ? "5p" : "3p", score, cand->strand,
+            cand->start + mature_mirna->start, cand->start + mature_mirna->end);
+    fprintf(fp,
+            "%s\t%llu\t%llu\tprecursor_%lld_mir_%ld_%s\t%d\t%c\t%llu\t%llu\n",
+            cand->chrom, cand->start, cand->end, cand->id, i,
+            (mature_mirna->arm == 5) ? "3p" : "5p", score, cand->strand,
+            cand->start + star_mirna->start, cand->start + star_mirna->end);
+  }
+
   return E_SUCCESS;
 }
 int write_gtf_line(FILE *fp, struct extended_candidate *ecand) {
@@ -706,10 +726,11 @@ int write_gtf_line(FILE *fp, struct extended_candidate *ecand) {
     star_read_count += star_reads->reads[i]->count;
   }
 
-  fprintf(fp,
-          "%s\tmiRA\texon\t%lld\t%lld\t0\t%c\t.\tgene_id \"Cluster_%lld_%s\"\n",
-          cand->chrom, cand->start + 1, cand->end, cand->strand, cand->id,
-          (cand->strand == '+') ? "plus" : "minus");
+  fprintf(
+      fp,
+      "%s\tmiRA\texon\t%lld\t%lld\t0\t%c\t.\tgene_id \"precursor_%lld_%s\"\n",
+      cand->chrom, cand->start + 1, cand->end, cand->strand, cand->id,
+      (cand->strand == '+') ? "plus" : "minus");
 
   return E_SUCCESS;
 }
@@ -794,7 +815,10 @@ int inititalize_html_report(FILE *fp) {
       "span></th><th><span>Arm<span class='glyphicon glyphicon-chevron-down' "
       "aria-hidden='true'></span></span></th><th><span>Star sequence<span "
       "class='glyphicon glyphicon-chevron-down' aria-hidden='true'></"
-      "span></th><th><span>Start(star)<span class='glyphicon "
+      "span></th><th><span>Dicer check<span class='glyphicon "
+      "glyphicon-chevron-down' "
+      "aria-hidden='true'></span></span></th><th><span>Start(star)<span "
+      "class='glyphicon "
       "glyphicon-chevron-down' aria-hidden='true'></span></span></"
       "th><th><span>Stop(star)<span class='glyphicon glyphicon-chevron-down' "
       "aria-hidden='true'></span></span></th></tr></thead><tbody>");
@@ -805,27 +829,37 @@ int write_html_table_row(FILE *fp, struct extended_candidate *ecand) {
     return E_FILE_WRITING_FAILED;
   }
   struct micro_rna_candidate *cand = ecand->cand;
-  struct candidate_subsequence *mature_mirna = ecand->mature_micro_rna;
-  struct candidate_subsequence *star_mirna = ecand->star_micro_rna;
-  fprintf(fp, "<tr><td ><a "
-              "href='reports/Cluster_%lld_report.pdf'>Cluster_%lld_%s</a></"
-              "td><td>%s</td><td>%s</td><td>%lld</"
-              "td><td>%lld</td><td>%7.5lf "
-              "</td><td>%7.5le</td><td>%7.5lf</td><td>",
-          cand->id, cand->id, (cand->strand == '-') ? "minus" : "plus",
-          cand->chrom, (cand->strand == '-') ? "minus" : "plus", cand->start,
-          cand->end, cand->mfe, cand->pvalue, cand->paired_fraction);
-  for (u32 i = mature_mirna->start; i < mature_mirna->end; i++) {
-    fprintf(fp, "%c", cand->sequence[i]);
+  struct candidate_subsequence_list *css_list = ecand->possible_micro_rnas;
+  struct candidate_subsequence *mature_mirna = NULL;
+  struct candidate_subsequence *star_mirna = NULL;
+
+  for (size_t i = 0; i < css_list->n; i++) {
+    mature_mirna = css_list->mature_sequences[i];
+    star_mirna = mature_mirna->matching_sequence;
+
+    fprintf(fp,
+            "<tr><td ><a "
+            "href='reports/Cluster_%lld_report.pdf'>precursor_%lld_%ld_%s</a></"
+            "td><td>%s</td><td>%s</td><td>%lld</"
+            "td><td>%lld</td><td>%7.5lf "
+            "</td><td>%7.5le</td><td>%7.5lf</td><td>",
+            cand->id, cand->id, i, (cand->strand == '-') ? "minus" : "plus",
+            cand->chrom, (cand->strand == '-') ? "minus" : "plus", cand->start,
+            cand->end, cand->mfe, cand->pvalue, cand->paired_fraction);
+    for (u32 i = mature_mirna->start; i < mature_mirna->end; i++) {
+      fprintf(fp, "%c", cand->sequence[i]);
+    }
+    fprintf(fp, "</td><td>%lld</td><td>%lld</td><td>%dp</td><td>",
+            cand->start + mature_mirna->start, cand->start + mature_mirna->end,
+            mature_mirna->arm);
+    for (u32 i = star_mirna->start; i < star_mirna->end; i++) {
+      fprintf(fp, "%c", cand->sequence[i]);
+    }
+    fprintf(fp, "</td><td>%s</td><td>%lld</td><td>%lld</td></tr>",
+            (star_mirna->is_artificial) ? "fail" : "success",
+            cand->start + star_mirna->start, cand->start + star_mirna->end);
   }
-  fprintf(fp, "</td><td>%lld</td><td>%lld</td><td>%dp</td><td>",
-          cand->start + mature_mirna->start, cand->start + mature_mirna->end,
-          mature_mirna->arm);
-  for (u32 i = star_mirna->start; i < star_mirna->end; i++) {
-    fprintf(fp, "%c", cand->sequence[i]);
-  }
-  fprintf(fp, "</td><td>%lld</td><td>%lld</td></tr>",
-          cand->start + star_mirna->start, cand->start + star_mirna->end);
+
   return E_SUCCESS;
 }
 
