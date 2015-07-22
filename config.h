@@ -20,7 +20,7 @@
 #define HAVE_JAVA 1
 
 /* Is a version of latex available */
-#define HAVE_LATEX 1
+/* #undef HAVE_LATEX */
 
 /* Define to 1 if you have the `m' library (-lm). */
 #define HAVE_LIBM 1
