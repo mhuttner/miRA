@@ -1,8 +1,10 @@
-#include <stddef.h>
-#include "uthash.h"
+
 
 #ifndef FASTA_H
 #define FASTA_H
+
+#include <stddef.h>
+#include "uthash.h"
 
 struct genome_sequence {
   char chrom[1024];

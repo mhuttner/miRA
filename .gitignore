@@ -37,3 +37,4 @@ tmp/
 test-suite.log
 test/.deps/
 test/.dirstamp
+example/sample_output_new

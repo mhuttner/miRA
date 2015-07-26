@@ -1,7 +1,9 @@
-#include "cluster.h"
+
 
 #ifndef BED_FILE_IO_H
 #define BED_FILE_IO_H
+
+#include "cluster.h"
 
 int write_bed_file(char *filename, struct cluster_list *list);
 int read_bed_file(struct cluster_list **list, char *filename);

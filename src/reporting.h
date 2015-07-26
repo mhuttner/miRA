@@ -1,3 +1,6 @@
+#ifndef REPORTING_H
+#define REPORTING_H
+
 #include "candidates.h"
 #include "errors.h"
 #include "coverage.h"
@@ -46,3 +49,5 @@ int finalize_html_report(FILE *fp);
 int cleanup_auxiliary_files(char *cov_plot_file, char *structure_file,
                             char *coverage_file, char *tex_file,
                             struct configuration_params *config);
+
+#endif

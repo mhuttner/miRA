@@ -1,9 +1,8 @@
 
 
-#include <stdlib.h>
-
 #ifndef UTIL_H
 #define UTIL_H
+#include <stdlib.h>
 
 enum log_level {
   LOG_LEVEL_QUIET = 0,
@@ -33,6 +32,9 @@ struct configuration_params {
   int allow_three_mismatches;
   int allow_two_terminal_mismatches;
 
+  int min_dicer_offset;
+  int max_dicer_offset;
+
   int create_coverage_plots;
   int create_structure_plots;
   int create_structure_coverage_plots;
@@ -60,6 +62,7 @@ void log_configuration(struct configuration_params *config);
 void log_basic(int loglevel, const char *msg, ...);
 void log_basic_timestamp(int loglevel, const char *msg, ...);
 void log_verbose(int loglevel, const char *msg, ...);
+void log_verbose_timestamp(int loglevel, const char *msg, ...);
 
 double mean(double *list, int n);
 double sd(double *list, int n, double mean);

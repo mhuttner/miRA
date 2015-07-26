@@ -84,6 +84,9 @@ static void set_default_config(struct configuration_params *config) {
   config->permutation_count = 100;
   config->max_pvalue = 0.01;
 
+  config->min_dicer_offset = 0;
+  config->max_dicer_offset = 3;
+
   config->min_coverage = 0.0001;
   config->min_paired_fraction = 0.67;
   config->min_duplex_length = 18;
@@ -180,7 +183,8 @@ static int parse_config_file(struct configuration_params *config,
       "max_hairpin_count",             "min_double_strand_length",
       "permutation_count",             "min_duplex_length",
       "max_duplex_length",             "allow_three_mismatches",
-      "allow_two_terminal_mismatches", "create_coverage_plots",
+      "allow_two_terminal_mismatches", "min_dicer_offset",
+      "max_dicer_offset",              "create_coverage_plots",
       "create_structure_plots",        "create_structure_coverage_plots",
       "cleanup_auxiliary_files"};
   int integer_token_offsets[] = {
@@ -199,12 +203,14 @@ static int parse_config_file(struct configuration_params *config,
       (int)offsetof(struct configuration_params, max_duplex_length),
       (int)offsetof(struct configuration_params, allow_three_mismatches),
       (int)offsetof(struct configuration_params, allow_two_terminal_mismatches),
+      (int)offsetof(struct configuration_params, min_dicer_offset),
+      (int)offsetof(struct configuration_params, max_dicer_offset),
       (int)offsetof(struct configuration_params, create_coverage_plots),
       (int)offsetof(struct configuration_params, create_structure_plots),
       (int)offsetof(struct configuration_params,
                     create_structure_coverage_plots),
       (int)offsetof(struct configuration_params, cleanup_auxiliary_files)};
-  const int integer_token_count = 19;
+  const int integer_token_count = 21;
   const char *double_tokens[] = {"max_mfe_per_nt", "max_pvalue", "min_coverage",
                                  "min_paired_fraction"};
   int double_token_offsets[] = {
@@ -389,6 +395,10 @@ void log_configuration(struct configuration_params *config) {
             config->allow_three_mismatches);
   log_basic(config->log_level, "    allow_two_terminal_mismatches %d\n",
             config->allow_two_terminal_mismatches);
+  log_basic(config->log_level, "    min_dicer_offset %d\n",
+            config->min_dicer_offset);
+  log_basic(config->log_level, "    max_dicer_offset %d\n",
+            config->max_dicer_offset);
   log_basic(config->log_level, "    create_coverage_plots %d\n",
             config->create_coverage_plots);
   log_basic(config->log_level, "    create_structure_plots %d\n",
@@ -435,6 +445,25 @@ void log_verbose(int loglevel, const char *msg, ...) {
   if (loglevel < LOG_LEVEL_VERBOSE) {
     return;
   }
+  va_list fmtargs;
+  va_start(fmtargs, msg);
+  vprintf(msg, fmtargs);
+  va_end(fmtargs);
+  fflush(stdout);
+}
+void log_verbose_timestamp(int loglevel, const char *msg, ...) {
+  if (loglevel < LOG_LEVEL_VERBOSE) {
+    return;
+  }
+  time_t ltime;
+  struct tm result;
+  char stime[32];
+  ltime = time(NULL);
+  localtime_r(&ltime, &result);
+  asctime_r(&result, stime);
+  /* remove newline */
+  stime[strlen(stime) - 1] = '\0';
+  printf("%s --- ", stime);
   va_list fmtargs;
   va_start(fmtargs, msg);
   vprintf(msg, fmtargs);
