@@ -231,7 +231,9 @@ int fold_sequences(struct sequence_list *seq_list,
       config->openmp_thread_count * sizeof(struct text_buffer *));
   for (int i = 0; i < config->openmp_thread_count; i++) {
     buffers[i] = NULL;
-    create_text_buffer(&buffers[i]);
+    if (config->log_level == LOG_LEVEL_VERBOSE) {
+      create_text_buffer(&buffers[i]);
+    }
   }
 
   size_t progress_count = 0;
@@ -327,8 +329,11 @@ int fold_sequences(struct sequence_list *seq_list,
                          fs->c->id);
   }
   for (int i = 0; i < config->openmp_thread_count; i++) {
-    printf("Thread %d:\n", i);
-    printf("%s", buffers[i]->start);
+    log_verbose(config->log_level,"Thread %d:\n", i);
+    if(buffers[i]== NULL){
+      continue;
+    }
+    log_verbose(config->log_level,"%s", buffers[i]->start);
     free_text_buffer(buffers[i]);
   }
   log_basic_timestamp(config->log_level, "Folding completed successfully.\n");
