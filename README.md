@@ -6,6 +6,16 @@ Software and source code for the paper:
 M. Evers, A. Dueck, G. Meister and J. C. Engelmann
 
 ### How to install:
+
+If you are running a recent 64bit Linux, or OSX Lion or later you can grab the miRA binary here:
+[Linux-64bit](bin/miRA-Linux-64bit)
+[OSX-64bit](bin/miRA-OSX-64bit)
+You will still need gnuplot and latex installed for your system. 
+You will also need the Varna binary: [Varna](VARNAv3-91.jar)
+Please place it into the same Folder the miRA binary is in. 
+
+#### Compiling from source
+
 For an easy setup simply download the 
 latest bundeled release archive: [miRA-1.1.1.tar.gz](miRA-1.1.1.tar.gz)
 
