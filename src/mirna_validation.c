@@ -58,7 +58,6 @@ int filter_mature_micro_rnas(struct extended_candidate *ecand,
     }
   }
   css_list->n = j;
-
   qsort(css_list->mature_sequences, css_list->n,
         sizeof(struct candidate_subsequence *), mirna_coverage_compare);
 
@@ -97,6 +96,7 @@ int filter_mature_micro_rnas(struct extended_candidate *ecand,
       free_candidate_subsequence(star_css);
     }
   }
+
   j = 0;
   for (size_t i = 0; i < css_list->n; i++) {
     css = css_list->mature_sequences[i];
@@ -236,6 +236,7 @@ int find_star_micro_rna(struct candidate_subsequence **result,
   }
   size_t l = star_end - star_start;
   if (l < config->min_duplex_length || l >= config->max_duplex_length) {
+    *result = NULL;
     return E_NO_STAR_MI_RNA_FOUND;
   }
 

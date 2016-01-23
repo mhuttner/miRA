@@ -77,28 +77,37 @@ int coverage_main(struct configuration_params *config, char *executable_file,
       break;
     }
   }
+  log_verbose_timestamp(config->log_level, "\tReading candidate file...\n");
   err = read_candidate_file(&c_list, mira_file);
   if (err) {
     goto error;
   }
+  log_verbose_timestamp(config->log_level, "\tParsing sam file...\n");
   err = parse_sam(&sam, sam_file);
   if (err) {
     goto error;
   }
+  log_verbose_timestamp(config->log_level, "\tCreating coverage table...\n");
   err = create_coverage_table(&cov_table, sam);
   if (err) {
     goto error;
   }
+  log_verbose_timestamp(config->log_level, "\tExtending candidates...\n");
   err = extend_all_candidates(&ec_list, c_list);
   if (err) {
     c_list = NULL;
     goto error;
   }
+  log_verbose_timestamp(config->log_level,
+                        "\tCoverage testing candidates...\n");
   err = coverage_test_candidates(ec_list, &cov_table, sam, config);
   if (err) {
     goto error;
   }
+  log_verbose_timestamp(config->log_level, "\tFreeing Sam file...\n");
+
   free_sam(sam);
+  log_verbose_timestamp(config->log_level, "\tAll OK\n");
   log_basic_timestamp(config->log_level,
                       "Coverage based verification completed\n");
   log_basic_timestamp(config->log_level, "Generating reports...\n");
@@ -189,21 +198,26 @@ int coverage_test_candidates(struct extended_candidate_list *cand_list,
     if (chrom_cov == NULL) {
       return E_CHROMOSOME_NOT_FOUND;
     }
+
     err = find_mature_micro_rnas(ecand, chrom_cov, config);
     if (err != E_SUCCESS) {
       continue;
     }
+
     validate_mature_micro_rnas(ecand, config);
+
     err = filter_mature_micro_rnas(ecand, chrom_cov, config);
     if (err != E_SUCCESS) {
       continue;
     }
+
     err = count_unique_reads(ecand, sam);
     if (err != E_SUCCESS) {
       continue;
     }
     ecand->is_valid = 1;
   }
+
   return E_SUCCESS;
 }
 
@@ -362,8 +376,8 @@ int create_extended_candidate(struct extended_candidate **ecand,
   return E_SUCCESS;
 }
 
-int
-create_candidate_subseqence_list(struct candidate_subsequence_list **css_list) {
+int create_candidate_subseqence_list(
+    struct candidate_subsequence_list **css_list) {
   const int INITIAL_CAPACITY = 32;
   struct candidate_subsequence_list *tmp_list =
       (struct candidate_subsequence_list *)malloc(
@@ -382,9 +396,9 @@ create_candidate_subseqence_list(struct candidate_subsequence_list **css_list) {
   *css_list = tmp_list;
   return E_SUCCESS;
 }
-int
-append_candidate_subseqence_list(struct candidate_subsequence_list *css_list,
-                                 struct candidate_subsequence *mature) {
+int append_candidate_subseqence_list(
+    struct candidate_subsequence_list *css_list,
+    struct candidate_subsequence *mature) {
   if (css_list->n >= css_list->capacity) {
     css_list->capacity *= 2;
     struct candidate_subsequence **tmp =
@@ -400,8 +414,8 @@ append_candidate_subseqence_list(struct candidate_subsequence_list *css_list,
   css_list->n++;
   return E_SUCCESS;
 }
-int
-free_candidate_subsequence_list(struct candidate_subsequence_list *css_list) {
+int free_candidate_subsequence_list(
+    struct candidate_subsequence_list *css_list) {
   for (size_t i = 0; i < css_list->n; i++) {
     free_candidate_subsequence(css_list->mature_sequences[i]);
   }

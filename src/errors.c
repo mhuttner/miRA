@@ -23,6 +23,7 @@ struct _errordesc errordesc[] = {
      "No secondary Structure containing the core region found"},
     {E_MALLOC_FAIL, "malloc failed, check available memory"},
     {E_REALLOC_FAIL, "realloc failed, check available memory"},
+    {E_NO_CLUSTERS_LEFT, "No clusters left to work with."},
     {E_UNKNOWN, "An unknown error occured"}};
 
 int print_error(int err) {

@@ -23,6 +23,9 @@ int read_fasta_file(struct genome_sequence **sequence_table, char *filename) {
       create_genome_sequence(&current_seq);
       sep = strchr(line, ' ');
       if (sep == NULL) {
+        sep = strchr(line, '\t');
+      }
+      if (sep == NULL) {
         sep = strchr(line, '\n');
       }
       if (sep == NULL) {
@@ -50,11 +53,11 @@ int read_fasta_file(struct genome_sequence **sequence_table, char *filename) {
       goto parse_error;
     }
   }
+  HASH_ADD_STR(*sequence_table, chrom, current_seq);
   if (*sequence_table == NULL) {
     fclose(fp);
     return E_UNKNOWN_FILE_IO_ERROR;
   }
-  HASH_ADD_STR(*sequence_table, chrom, current_seq);
   fclose(fp);
   return E_SUCCESS;
 

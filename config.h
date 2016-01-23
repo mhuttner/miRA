@@ -20,7 +20,7 @@
 #define HAVE_JAVA 1
 
 /* Is a version of latex available */
-/* #undef HAVE_LATEX */
+#define HAVE_LATEX 1
 
 /* Define to 1 if you have the `m' library (-lm). */
 #define HAVE_LIBM 1
@@ -118,7 +118,7 @@
 #define PACKAGE_NAME "miRA"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "miRA 1.1.1"
+#define PACKAGE_STRING "miRA 1.1.3"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "miRA"
@@ -127,13 +127,13 @@
 #define PACKAGE_URL "http://mhuttner.com/"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.1.1"
+#define PACKAGE_VERSION "1.1.3"
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
 
 /* Version number of package */
-#define VERSION "1.1.1"
+#define VERSION "1.1.3"
 
 /* Define if using the dmalloc debugging malloc package */
 /* #undef WITH_DMALLOC */

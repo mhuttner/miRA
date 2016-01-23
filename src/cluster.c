@@ -19,7 +19,7 @@ int cluster(int argc, char **argv) {
   char default_output_file[] = "contigs.bed";
   char *output_file = default_output_file;
 
-  while ((c = getopt(argc, argv, "c:o:h")) != -1) {
+  while ((c = getopt(argc, argv, "vc:o:h")) != -1) {
     switch (c) {
 
     case 'c':
@@ -72,41 +72,75 @@ int cluster_main(struct configuration_params *config, char *sam_file,
   struct chrom_info *chromosome_table = NULL;
   log_basic_timestamp(config->log_level, "Clustering reads...\n");
 
-  parse_clusters(&chromosome_table, &list, sam_file);
-
   int err;
 
+  log_verbose_timestamp(config->log_level, "\tReading SAM file...\n");
+  err = parse_clusters(config, &chromosome_table, &list, sam_file);
+  if (err != E_SUCCESS) {
+    print_error(err);
+    return err;
+  }
+  log_verbose_timestamp(config->log_level,
+                        "\tRead SAM file successfully. %ld entries\n", list->n);
+
+  log_verbose_timestamp(config->log_level, "\tSorting entries...\n");
   sort_clusters(list, compare_strand_chrom_start);
+  log_verbose_timestamp(config->log_level, "\tSorting completed.\n");
+  log_verbose_timestamp(config->log_level,
+                        "\tMerging overlapping clusters...\n");
   err = merge_clusters(list, 0);
+
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
+  log_verbose_timestamp(config->log_level,
+                        "\tMerging done. %ld clusters left\n", list->n);
+  log_verbose_timestamp(config->log_level,
+                        "\tFiltering clusters with to few reads...\n");
   err = filter_clusters(list, config->cluster_min_reads);
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
+  log_verbose_timestamp(config->log_level,
+                        "\tFiltering done. %ld clusters left\n", list->n);
+  log_verbose_timestamp(config->log_level, "\tMerging close clusters...\n");
   err = merge_clusters(list, config->cluster_gap_size);
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
+  log_verbose_timestamp(config->log_level,
+                        "\tMerging done. %ld clusters left\n", list->n);
+  log_verbose_timestamp(config->log_level, "\tExtending clusters...\n");
   err = extend_clusters(list, &chromosome_table, config->cluster_flank_size);
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
+  log_verbose_timestamp(config->log_level, "\tExtending clusters done.");
+  log_verbose_timestamp(config->log_level, "\tMerging extended clusters...\n");
   err = merge_extended_clusters(list, config->cluster_max_length);
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
+  log_verbose_timestamp(config->log_level,
+                        "\tMerging done. %ld clusters left\n", list->n);
+  log_verbose_timestamp(config->log_level, "\tFiltering to long clusters...\n");
   err = filter_extended_clusters(list, config->cluster_max_length);
   if (err != E_SUCCESS) {
     goto error_clusters;
   }
-  sort_clusters(list, compare_chrom_flank);
+  log_verbose_timestamp(config->log_level,
+                        "\tFiltering done. %ld clusters left\n", list->n);
 
+  log_verbose_timestamp(config->log_level, "\tSorting entries...\n");
+  sort_clusters(list, compare_chrom_flank);
+  log_verbose_timestamp(config->log_level, "\tSorting completed.\n");
+
+  log_verbose_timestamp(config->log_level, "\tWriting bed file...\n");
   err = write_bed_file(output_file, list);
   if (err) {
     goto error_clusters;
   }
+  log_verbose_timestamp(config->log_level, "\tWriting bed file done.\n");
 
   free_chromosome_table(&chromosome_table);
   free_clusters(list);
@@ -122,7 +156,8 @@ error_clusters:
   return err;
 }
 
-int parse_clusters(struct chrom_info **table, struct cluster_list **list,
+int parse_clusters(struct configuration_params *config,
+                   struct chrom_info **table, struct cluster_list **list,
                    char *file) {
   static const int MAXLINELENGHT = 2048;
   static const int STARTINGSIZE = 1024;
@@ -143,11 +178,17 @@ int parse_clusters(struct chrom_info **table, struct cluster_list **list,
   struct sq_header *tmp_header = NULL;
   struct chrom_info *info = NULL;
   struct cluster *c = NULL;
+  size_t ignored = 0;
+  size_t line_num = 0;
   while (fgets(line, sizeof(line), fp) != NULL) {
+    line_num++;
     int result = parse_line(&tmp_entry, line);
     if (result == E_SAM_HEADER_LINE) {
       int err = parse_header(&tmp_header, line);
       if (err != E_SUCCESS) {
+        log_verbose_timestamp(config->log_level, "\tLine %ld ignored.\n",
+                              line_num);
+        ignored += 1;
         continue;
       }
       info = (struct chrom_info *)malloc(sizeof(struct chrom_info));
@@ -162,6 +203,9 @@ int parse_clusters(struct chrom_info **table, struct cluster_list **list,
       continue;
     }
     if (result != E_SUCCESS) {
+      log_verbose_timestamp(config->log_level, "\tLine %ld ignored.\n",
+                            line_num);
+      ignored += 1;
       continue;
     }
 
@@ -188,6 +232,12 @@ int parse_clusters(struct chrom_info **table, struct cluster_list **list,
     tmp_list->n++;
   }
   fclose(fp);
+  if (ignored > 0) {
+    log_basic_timestamp(
+        config->log_level,
+        "%ld lines of the SAM file were ignored because they were invalid \n",
+        ignored);
+  }
   *list = tmp_list;
 
   return E_SUCCESS;
@@ -280,6 +330,10 @@ int merge_clusters(struct cluster_list *list, int max_gap) {
     }
   }
   size_t new_size = top + 1 - new_clusters;
+  if (new_size == 0) {
+    free(new_clusters);
+    return E_NO_CLUSTERS_LEFT;
+  }
   struct cluster **tmp = (struct cluster **)realloc(
       new_clusters, new_size * sizeof(struct cluster *));
   if (tmp == NULL) {
@@ -309,6 +363,10 @@ int filter_clusters(struct cluster_list *list, int minreads) {
     }
   }
   size_t new_size = top - new_clusters;
+  if (new_size == 0) {
+    free(new_clusters);
+    return E_NO_CLUSTERS_LEFT;
+  }
   struct cluster **tmp = (struct cluster **)realloc(
       new_clusters, new_size * sizeof(struct cluster *));
   if (tmp == NULL) {
@@ -379,6 +437,10 @@ int merge_extended_clusters(struct cluster_list *list, int max_length) {
     }
   }
   size_t new_size = top + 1 - new_clusters;
+  if (new_size == 0) {
+    free(new_clusters);
+    return E_NO_CLUSTERS_LEFT;
+  }
   struct cluster **tmp = (struct cluster **)realloc(
       new_clusters, new_size * sizeof(struct cluster *));
   if (tmp == NULL) {
@@ -408,6 +470,10 @@ int filter_extended_clusters(struct cluster_list *list, int max_length) {
     }
   }
   size_t new_size = top - new_clusters;
+  if (new_size == 0) {
+    free(new_clusters);
+    return E_NO_CLUSTERS_LEFT;
+  }
   struct cluster **tmp = (struct cluster **)realloc(
       new_clusters, new_size * sizeof(struct cluster *));
   if (tmp == NULL) {

@@ -1,4 +1,4 @@
-AC_INIT([miRA], [1.1.1], [michael@mhuttner.com],
+AC_INIT([miRA], [1.1.3], [michael@mhuttner.com],
         [miRA], [http://mhuttner.com/])
 AC_PREREQ([2.68])
 

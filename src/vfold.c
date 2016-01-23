@@ -329,11 +329,11 @@ int fold_sequences(struct sequence_list *seq_list,
                          fs->c->id);
   }
   for (int i = 0; i < config->openmp_thread_count; i++) {
-    log_verbose(config->log_level,"Thread %d:\n", i);
-    if(buffers[i]== NULL){
+    log_verbose(config->log_level, "Thread %d:\n", i);
+    if (buffers[i] == NULL) {
       continue;
     }
-    log_verbose(config->log_level,"%s", buffers[i]->start);
+    log_verbose(config->log_level, "%s", buffers[i]->start);
     free_text_buffer(buffers[i]);
   }
   log_basic_timestamp(config->log_level, "Folding completed successfully.\n");
