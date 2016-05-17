@@ -19,12 +19,12 @@ Please place it into the same Folder the miRA binary is in.
 #### Compiling from source
 
 For an easy setup simply download the 
-latest bundeled release archive: [miRA-1.1.3.tar.gz](miRA-1.1.3.tar.gz)
+latest bundeled release archive: [miRA-1.1.4.tar.gz](miRA-1.1.4.tar.gz)
 
 
 unpack it, using for example
 ```sh
-tar -xvf miRA-1.1.3.tar.gz
+tar -xvf miRA-1.1.4.tar.gz
 ```
 Make sure your system supplies the following dependecies for miRA:
 
@@ -37,7 +37,7 @@ Make sure your system supplies the following dependecies for miRA:
 
 Compile it for your system with:
 ```sh
-cd miRA-1.1.3
+cd miRA-1.1.4
 ./configure
 make
 ```

@@ -42,7 +42,9 @@ int full(int argc, char **argv) {
   }
   struct configuration_params *config = NULL;
   initialize_configuration(&config, config_file);
-  config->log_level = log_level;
+  if (log_level != LOG_LEVEL_BASIC) {
+    config->log_level = log_level;
+  }
   log_configuration(config);
 
   int err;
