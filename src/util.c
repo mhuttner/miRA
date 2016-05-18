@@ -30,6 +30,8 @@ int create_text_buffer(struct text_buffer **buffer) {
   return E_SUCCESS;
 }
 void print_to_text_buffer(struct text_buffer *buffer, const char *msg, ...) {
+  // temporary disabled because of memory error (see issue #1)
+  return;
   if (buffer == NULL) {
     return;
   }
@@ -176,17 +178,14 @@ static int parse_config_file(struct configuration_params *config,
                              char *config_file) {
   const int MAXLINELENGTH = 1024;
   const char *integer_tokens[] = {
-      "log_level",                     "openmp_thread_count",
-      "cluster_gap_size",              "cluster_min_reads",
-      "cluster_flank_size",            "cluster_max_length",
-      "max_precursor_length",          "min_precursor_length",
-      "max_hairpin_count",             "min_double_strand_length",
-      "permutation_count",             "min_duplex_length",
-      "max_duplex_length",             "allow_three_mismatches",
-      "allow_two_terminal_mismatches", "min_dicer_offset",
-      "max_dicer_offset",              "create_coverage_plots",
-      "create_structure_plots",        "create_structure_coverage_plots",
-      "cleanup_auxiliary_files"};
+      "log_level", "openmp_thread_count", "cluster_gap_size",
+      "cluster_min_reads", "cluster_flank_size", "cluster_max_length",
+      "max_precursor_length", "min_precursor_length", "max_hairpin_count",
+      "min_double_strand_length", "permutation_count", "min_duplex_length",
+      "max_duplex_length", "allow_three_mismatches",
+      "allow_two_terminal_mismatches", "min_dicer_offset", "max_dicer_offset",
+      "create_coverage_plots", "create_structure_plots",
+      "create_structure_coverage_plots", "cleanup_auxiliary_files"};
   int integer_token_offsets[] = {
       (int)offsetof(struct configuration_params, log_level),
       (int)offsetof(struct configuration_params, openmp_thread_count),

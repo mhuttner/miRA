@@ -229,14 +229,14 @@ int fold_sequences(struct sequence_list *seq_list,
   struct foldable_sequence *fs = NULL;
   struct structure_list *s_list = NULL;
   struct text_buffer *buf = NULL;
-  struct text_buffer **buffers = (struct text_buffer **)malloc(
-      config->openmp_thread_count * sizeof(struct text_buffer *));
-  for (int i = 0; i < config->openmp_thread_count; i++) {
-    buffers[i] = NULL;
-    if (config->log_level == LOG_LEVEL_VERBOSE) {
-      create_text_buffer(&buffers[i]);
-    }
-  }
+  // struct text_buffer **buffers = (struct text_buffer **)malloc(
+  //     config->openmp_thread_count * sizeof(struct text_buffer *));
+  // for (int i = 0; i < config->openmp_thread_count; i++) {
+  //   buffers[i] = NULL;
+  //   if (config->log_level == LOG_LEVEL_VERBOSE) {
+  //     create_text_buffer(&buffers[i]);
+  //   }
+  // }
 
   size_t progress_count = 0;
 
@@ -244,12 +244,12 @@ int fold_sequences(struct sequence_list *seq_list,
 #pragma omp parallel for private(fs, s_list,                                   \
                                  buf) shared(buffers) schedule(dynamic)
   for (size_t i = 0; i < seq_list->n; i++) {
-#ifdef _OPENMP
-    int tid = omp_get_thread_num();
-    buf = buffers[tid];
-#else
-    buf = buffers[0];
-#endif
+// #ifdef _OPENMP
+//     int tid = omp_get_thread_num();
+//     buf = buffers[tid];
+// #else
+//     buf = buffers[0];
+// #endif
 
 #pragma omp critical
     {
@@ -267,10 +267,11 @@ int fold_sequences(struct sequence_list *seq_list,
     Lfold(&s_list, fs->seq, max_length);
     find_optimal_structure(s_list, fs, config);
     free_structure_list(s_list);
+
     if (fs->structure == NULL) {
       print_to_text_buffer(
           buf,
-          "Cluster %lld \x1b[32m[INVALID]\x1b[0m \n\t No structure found \n",
+          "Cluster %lld \x1b[31m[INVALID]\x1b[0m \n\t No structure found \n",
           fs->c->id);
       continue;
     }
@@ -330,14 +331,14 @@ int fold_sequences(struct sequence_list *seq_list,
     print_to_text_buffer(buf, "Cluster %lld \x1b[32m[VALID]\x1b[0m \n",
                          fs->c->id);
   }
-  for (int i = 0; i < config->openmp_thread_count; i++) {
-    log_verbose(config->log_level, "Thread %d:\n", i);
-    if (buffers[i] == NULL) {
-      continue;
-    }
-    log_verbose(config->log_level, "%s", buffers[i]->start);
-    free_text_buffer(buffers[i]);
-  }
+  // for (int i = 0; i < config->openmp_thread_count; i++) {
+  //   log_verbose(config->log_level, "Thread %d:\n", i);
+  //   if (buffers[i] == NULL) {
+  //     continue;
+  //   }
+  //   log_verbose(config->log_level, "%s", buffers[i]->start);
+  //   free_text_buffer(buffers[i]);
+  // }
   log_basic_timestamp(config->log_level, "Folding completed successfully.\n");
   return E_SUCCESS;
 };
@@ -415,7 +416,7 @@ int find_optimal_structure(struct structure_list *s_list,
   double min_mfe = DBL_MAX;
   struct cluster *c = fs->c;
   u64 local_core_start = c->start - c->flank_start;
-  /* offset du to bed file format */
+  /* offset due to bed file format */
   u64 local_core_end = c->end - c->flank_start - 1;
   for (size_t i = 0; i < s_list->n; i++) {
     ss = s_list->structures[i];
