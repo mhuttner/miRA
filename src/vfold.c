@@ -241,8 +241,9 @@ int fold_sequences(struct sequence_list *seq_list,
   size_t progress_count = 0;
 
   log_basic_timestamp(config->log_level, "Initializing folding...\n");
-#pragma omp parallel for private(fs, s_list,                                   \
-                                 buf) shared(buffers) schedule(dynamic)
+// #pragma omp parallel for private(fs, s_list,                                   \
+//                                  buf) shared(buffers) schedule(dynamic)
+#pragma omp parallel for private(fs, s_list, buf) schedule(dynamic)
   for (size_t i = 0; i < seq_list->n; i++) {
 // #ifdef _OPENMP
 //     int tid = omp_get_thread_num();
