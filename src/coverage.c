@@ -51,7 +51,7 @@ int coverage(int argc, char **argv) {
   }
   log_configuration(config);
   int err = coverage_main(config, argv[-1], argv[optind], argv[optind + 1],
-                          argv[optind + 2]);
+                          argv[optind + 2], NULL);
   free(config);
   return err;
 }
@@ -65,7 +65,8 @@ static int print_help() {
 }
 
 int coverage_main(struct configuration_params *config, char *executable_file,
-                  char *mira_file, char *sam_file, char *output_path) {
+                  char *mira_file, char *sam_file, char *output_path,
+                  char *selected_crom) {
   int err;
   struct sam_file *sam = NULL;
   struct candidate_list *c_list = NULL;
@@ -85,7 +86,7 @@ int coverage_main(struct configuration_params *config, char *executable_file,
     goto error;
   }
   log_verbose_timestamp(config->log_level, "\tParsing sam file...\n");
-  err = parse_sam(&sam, sam_file);
+  err = parse_sam(&sam, sam_file, selected_crom);
   if (err) {
     goto error;
   }

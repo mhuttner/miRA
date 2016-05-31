@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int read_fasta_file(struct genome_sequence **sequence_table, char *filename) {
+int read_fasta_file(struct genome_sequence **sequence_table, char *filename,
+                    char *selected_crom) {
   static const char name_marker = '>';
   static const int MAXLINELENGHT = 2048;
   struct genome_sequence *current_seq = NULL;
@@ -38,6 +39,16 @@ int read_fasta_file(struct genome_sequence **sequence_table, char *filename) {
       l = sep - line - 1;
       memcpy(current_seq->chrom, line + 1, l);
       current_seq->chrom[l] = 0;
+      if (selected_crom != NULL) {
+        if (strcmp(current_seq->chrom, selected_crom) != 0) {
+          free(current_seq->data);
+          free(current_seq);
+          current_seq = NULL;
+        }
+      }
+      continue;
+    }
+    if (current_seq == NULL) {
       continue;
     }
     sep = strchr(line, '\n');
@@ -53,7 +64,9 @@ int read_fasta_file(struct genome_sequence **sequence_table, char *filename) {
       goto parse_error;
     }
   }
-  HASH_ADD_STR(*sequence_table, chrom, current_seq);
+  if (current_seq != NULL) {
+    HASH_ADD_STR(*sequence_table, chrom, current_seq);
+  }
   if (*sequence_table == NULL) {
     fclose(fp);
     return E_UNKNOWN_FILE_IO_ERROR;

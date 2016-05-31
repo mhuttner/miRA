@@ -49,7 +49,8 @@ enum sam_flag {
   SUPPLEMENTARY = 0x800
 };
 
-int parse_sam(struct sam_file **sam, char *file);
+int parse_sam(struct sam_file **sam, char *file, char *selected_crom);
+int parse_sam_headers(struct sam_file **sam, char *file);
 int parse_line(struct sam_entry **entry, char *line);
 int parse_header(struct sq_header **header, char *line);
 int free_sam(struct sam_file *sam);

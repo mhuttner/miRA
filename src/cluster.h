@@ -32,11 +32,11 @@ struct chrom_info {
 
 int cluster(int argc, char **argv);
 int cluster_main(struct configuration_params *config, char *sam_file,
-                 char *output_file);
+                 char *output_file, char *selected_crom);
 
 int parse_clusters(struct configuration_params *config,
                    struct chrom_info **table, struct cluster_list **list,
-                   char *file);
+                   char *file, char *selected_crom);
 int create_clusters(struct cluster_list **list, size_t n);
 
 int sort_clusters(struct cluster_list *list,

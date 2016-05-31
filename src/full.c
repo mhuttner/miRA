@@ -60,7 +60,7 @@ int full(int argc, char **argv) {
   char bed_filename[] = "cluster_contigs.bed";
   char *bed_file_path = NULL;
   create_file_path(&bed_file_path, output_path, bed_filename);
-  err = cluster_main(config, sam_file, bed_file_path);
+  err = cluster_main(config, sam_file, bed_file_path, NULL);
   if (err) {
     free(bed_file_path);
     return err;
@@ -68,22 +68,23 @@ int full(int argc, char **argv) {
   char mira_filename[] = "fold_candidates.miRA";
   char *mira_file_path = NULL;
   create_file_path(&mira_file_path, output_path, mira_filename);
-  err = vfold_main(config, bed_file_path, fasta_file, mira_file_path);
+  err = vfold_main(config, bed_file_path, fasta_file, mira_file_path, NULL);
   if (err) {
     free(bed_file_path);
     free(mira_file_path);
     return err;
   }
 
-  err = coverage_main(config, argv[-1], mira_file_path, sam_file, output_path);
+  err = coverage_main(config, argv[-1], mira_file_path, sam_file, output_path,
+                      NULL);
   free(bed_file_path);
   free(mira_file_path);
-  free(config);
   if (err) {
     return err;
   }
   log_basic(config->log_level,
             "All steps completed successfully. Exiting... \n");
+  free(config);
   return E_SUCCESS;
 }
 

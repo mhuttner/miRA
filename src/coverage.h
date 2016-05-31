@@ -55,7 +55,8 @@ struct extended_candidate_list {
 
 int coverage(int argc, char **argv);
 int coverage_main(struct configuration_params *config, char *executable_file,
-                  char *mira_file, char *sam_file, char *output_path);
+                  char *mira_file, char *sam_file, char *output_path,
+                  char *selected_crom);
 int create_coverage_table(struct chrom_coverage **table, struct sam_file *sam);
 int coverage_test_candidates(struct extended_candidate_list *ecand_list,
                              struct chrom_coverage **coverage_table,
@@ -70,13 +71,13 @@ int extend_all_candidates(struct extended_candidate_list **ecand_list,
 
 int create_extended_candidate(struct extended_candidate **ecand,
                               struct micro_rna_candidate *cand);
-int
-create_candidate_subseqence_list(struct candidate_subsequence_list **css_list);
-int
-append_candidate_subseqence_list(struct candidate_subsequence_list *css_list,
-                                 struct candidate_subsequence *mature);
-int
-free_candidate_subsequence_list(struct candidate_subsequence_list *css_list);
+int create_candidate_subseqence_list(
+    struct candidate_subsequence_list **css_list);
+int append_candidate_subseqence_list(
+    struct candidate_subsequence_list *css_list,
+    struct candidate_subsequence *mature);
+int free_candidate_subsequence_list(
+    struct candidate_subsequence_list *css_list);
 int create_candidate_subseqence(struct candidate_subsequence **cs, u32 start,
                                 u32 end, u64 coverage, double paired_fraction);
 int free_extended_candidate_list(struct extended_candidate_list *ecand_list);

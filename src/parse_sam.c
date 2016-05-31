@@ -5,7 +5,7 @@
 #include "parse_sam.h"
 #include "errors.h"
 
-int parse_sam(struct sam_file **sam, char *file) {
+int parse_sam(struct sam_file **sam, char *file, char *selected_crom) {
   static const int MAXLINELENGHT = 2048;
   static const int STARTINGSIZE = 1024;
   struct sam_file *data = (struct sam_file *)malloc(sizeof(struct sam_file));
@@ -38,9 +38,10 @@ int parse_sam(struct sam_file **sam, char *file) {
     free(data);
     return E_FILE_NOT_FOUND;
   }
+  struct sam_entry *tmp_entry = NULL;
   char line[MAXLINELENGHT];
   while (fgets(line, sizeof(line), fp) != NULL) {
-    int result = parse_line(data->entries + data->n, line);
+    int result = parse_line(&tmp_entry, line);
     if (result == E_SAM_HEADER_LINE) {
       int err = parse_header(data->headers + data->header_n, line);
       if (err != E_SUCCESS)
@@ -61,6 +62,14 @@ int parse_sam(struct sam_file **sam, char *file) {
     }
     if (result != E_SUCCESS)
       continue;
+    if (selected_crom != NULL) {
+      if (strcmp(tmp_entry->rname, selected_crom) != 0) {
+        free_sam_entry(tmp_entry);
+        continue;
+      }
+    }
+    *(data->entries + data->n) = tmp_entry;
+
     data->n++;
     if (data->n == data->capacity) {
       data->capacity *= 2;
@@ -79,6 +88,62 @@ int parse_sam(struct sam_file **sam, char *file) {
 
   return E_SUCCESS;
 }
+int parse_sam_headers(struct sam_file **sam, char *file) {
+  static const int MAXLINELENGHT = 2048;
+  static const int STARTINGSIZE = 1024;
+  const char header_line_marker = '@';
+  struct sam_file *data = (struct sam_file *)malloc(sizeof(struct sam_file));
+  if (data == NULL) {
+    return E_MALLOC_FAIL;
+  }
+  data->capacity = 0;
+  data->entries = NULL;
+  data->n = 0;
+
+  data->header_cap = STARTINGSIZE;
+  data->headers = (struct sq_header **)malloc(data->header_cap *
+                                              sizeof(struct sq_header *));
+  if (data->headers == NULL) {
+    free(data->entries);
+    free(data);
+    return E_MALLOC_FAIL;
+  }
+  data->header_n = 0;
+
+  FILE *fp = fopen(file, "r");
+  if (fp == NULL) {
+    free(data->headers);
+    free(data);
+    return E_FILE_NOT_FOUND;
+  }
+
+  char line[MAXLINELENGHT];
+  while (fgets(line, sizeof(line), fp) != NULL) {
+    if (line[0] == header_line_marker) {
+      int err = parse_header(data->headers + data->header_n, line);
+      if (err != E_SUCCESS)
+        continue;
+      data->header_n++;
+      if (data->header_n == data->header_cap) {
+        data->header_cap *= 2;
+        struct sq_header **tmph = (struct sq_header **)realloc(
+            data->headers, data->header_cap * sizeof(struct sq_header *));
+        if (tmph == NULL) {
+          free_sam(data);
+          fclose(fp);
+          return E_REALLOC_FAIL;
+        }
+        data->headers = tmph;
+      }
+      continue;
+    }
+  }
+  fclose(fp);
+  *sam = data;
+
+  return E_SUCCESS;
+}
+
 int parse_line(struct sam_entry **entry, char *line) {
   const char seperator = '\t';
   const int num_entries = 11;
@@ -243,8 +308,12 @@ int free_sam(struct sam_file *sam) {
   for (size_t i = 0; i < sam->header_n; i++) {
     free_sam_header(sam->headers[i]);
   }
-  free(sam->entries);
-  free(sam->headers);
+  if (sam->entries != NULL) {
+    free(sam->entries);
+  }
+  if (sam->headers != NULL) {
+    free(sam->headers);
+  }
   free(sam);
   return E_SUCCESS;
 }

@@ -294,7 +294,7 @@ int create_coverage_plot(char **result_file, struct extended_candidate *ecand,
           "'plus','' using 4:2 with histeps lw 2 linecolor rgb 'red' axes x2y1 "
           "notitle, '' using 1:3 with histeps lw 2 linecolor rgb 'blue' title "
           "'minus', '' using 4:3 with histeps lw 2 linecolor rgb 'blue' "
-          "notitle\" &>/dev/null",
+          "notitle\" ",
           file_path, box1_start, box1_end, box2_start, box2_end, y_max, x_start,
           x_end, x2_start, x2_end, data_file_path);
   int err = system(gnuplot_system_call);
@@ -349,7 +349,7 @@ int create_structure_image(char **result_file, struct extended_candidate *ecand,
            "-autoTerminalLoops %s -resolution %d -highlightRegion "
            "\"%d-%d:fill=%s;%d-%d:fill=%s\" -title \"Cluster %lld\" "
            "-sequenceDBN \"%s\" "
-           "-structureDBN \"%s\" -o %s &>/dev/null",
+           "-structureDBN \"%s\" -o %s ",
            varna_path, varna_class_name, varna_algorith,
            varna_auto_interior_loops, varna_auto_terminal_loops,
            varna_resolution, m_start, m_end, hex_color_red, s_start, s_end,
@@ -420,7 +420,7 @@ int create_coverage_image(char **result_file, struct extended_candidate *ecand,
            "-autoTerminalLoops %s -resolution %d -highlightRegion "
            "\"%s\" -title \"Cluster %lld\" "
            "-sequenceDBN \"%s\" "
-           "-structureDBN \"%s\" -o %s &>/dev/null",
+           "-structureDBN \"%s\" -o %s ",
            varna_path, varna_class_name, varna_algorith,
            varna_auto_interior_loops, varna_auto_terminal_loops,
            varna_resolution, highlight_string, cand->id, seq, structure,

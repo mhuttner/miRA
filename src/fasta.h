@@ -14,7 +14,8 @@ struct genome_sequence {
   UT_hash_handle hh;
 };
 
-int read_fasta_file(struct genome_sequence **sequence_table, char *filename);
+int read_fasta_file(struct genome_sequence **sequence_table, char *filename,
+                    char *selected_crom);
 int create_genome_sequence(struct genome_sequence **seq);
 int strip_newlines(char **dest, size_t *nsize, char *buffer, size_t size);
 int append_to_genome_sequence(struct genome_sequence *seq, char *data,

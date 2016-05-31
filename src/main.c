@@ -8,11 +8,13 @@
 #include "errors.h"
 #include "coverage.h"
 #include "full.h"
+#include "batch.h"
 
 int main(int argc, char **argv) {
   /* List of all available operations */
-  const char *operations[] = {"help", "cluster", "fold", "coverage", "full"};
-  const int num_operations = 5;
+  const char *operations[] = {"help",     "cluster", "fold",
+                              "coverage", "full",    "batch"};
+  const int num_operations = 6;
 
   int operation_type = 0;
   if (argc >= 2) {
@@ -35,6 +37,8 @@ int main(int argc, char **argv) {
     return coverage(argc - 1, argv + 1);
   case 4: /* full */
     return full(argc - 1, argv + 1);
+  case 5: /*batch */
+    return batch(argc - 1, argv + 1);
   default:
     break;
   }

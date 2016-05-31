@@ -24,6 +24,8 @@ int help(int argc, char **argv) {
       "    coverage   coverage based verification and reporting\n"
       "    full       run the full miRA algorithm cluster, fold and \n"
       "               coverage in sequence\n"
+      "    batch      run the full miRA algorithm cluster, fold and \n"
+      "               coverage in sequence separately for each chromosome\n"
       "    help       show this help message\n"
       "\n"
       "Example Usage:\n"

@@ -53,7 +53,7 @@ int cluster(int argc, char **argv) {
   }
   log_configuration(config);
   int err;
-  err = cluster_main(config, argv[optind], output_file);
+  err = cluster_main(config, argv[optind], output_file, NULL);
   free(config);
   return err;
 }
@@ -69,7 +69,7 @@ static int print_help() {
 }
 
 int cluster_main(struct configuration_params *config, char *sam_file,
-                 char *output_file) {
+                 char *output_file, char *selected_crom) {
   struct cluster_list *list = NULL;
   struct chrom_info *chromosome_table = NULL;
   log_basic_timestamp(config->log_level, "Clustering reads...\n");
@@ -77,7 +77,8 @@ int cluster_main(struct configuration_params *config, char *sam_file,
   int err;
 
   log_verbose_timestamp(config->log_level, "\tReading SAM file...\n");
-  err = parse_clusters(config, &chromosome_table, &list, sam_file);
+  err =
+      parse_clusters(config, &chromosome_table, &list, sam_file, selected_crom);
   if (err != E_SUCCESS) {
     print_error(err);
     return err;
@@ -160,7 +161,7 @@ error_clusters:
 
 int parse_clusters(struct configuration_params *config,
                    struct chrom_info **table, struct cluster_list **list,
-                   char *file) {
+                   char *file, char *selected_crom) {
   static const int MAXLINELENGHT = 2048;
   static const int STARTINGSIZE = 1024;
   struct cluster_list *tmp_list = NULL;
@@ -209,6 +210,12 @@ int parse_clusters(struct configuration_params *config,
                             line_num);
       ignored += 1;
       continue;
+    }
+    if (selected_crom != NULL) {
+      if (strcmp(tmp_entry->rname, selected_crom) != 0) {
+        free_sam_entry(tmp_entry);
+        continue;
+      }
     }
 
     if (tmp_list->n == tmp_list->capacity) {

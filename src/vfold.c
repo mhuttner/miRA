@@ -64,13 +64,13 @@ int vfold(int argc, char *argv[]) {
   }
   log_configuration(config);
   int err;
-  err = vfold_main(config, argv[optind], argv[optind + 1], output_file);
+  err = vfold_main(config, argv[optind], argv[optind + 1], output_file, NULL);
   free(config);
   return err;
 }
 
 int vfold_main(struct configuration_params *config, char *bed_file,
-               char *fasta_file, char *output_file) {
+               char *fasta_file, char *output_file, char *selected_crom) {
 
 #ifdef _OPENMP
   omp_set_num_threads(config->openmp_thread_count);
@@ -83,14 +83,18 @@ int vfold_main(struct configuration_params *config, char *bed_file,
   char *json_output_file = NULL;
   char *mira_output_file = NULL;
   int err;
+  log_verbose_timestamp(config->log_level, "\tReading BED file...\n");
   err = read_bed_file(&c_list, bed_file);
   if (err) {
     goto bed_read_err;
   }
-  err = read_fasta_file(&seq_table, fasta_file);
+  log_verbose_timestamp(config->log_level, "\tReading BED file successful\n");
+  log_verbose_timestamp(config->log_level, "\tReading FASTA file...\n");
+  err = read_fasta_file(&seq_table, fasta_file, selected_crom);
   if (err) {
     goto fasta_read_err;
   }
+  log_verbose_timestamp(config->log_level, "\tReading FASTA file successful\n");
   err = map_clusters(&seq_list, c_list, seq_table);
   if (err) {
     goto map_error;
